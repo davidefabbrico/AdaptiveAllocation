@@ -11,8 +11,20 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// sum_allocation
+arma::irowvec sum_allocation(arma::irowvec z, int K);
+RcppExport SEXP _AdaptiveAllocation_sum_allocation(SEXP zSEXP, SEXP KSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    rcpp_result_gen = Rcpp::wrap(sum_allocation(z, K));
+    return rcpp_result_gen;
+END_RCPP
+}
 // callrgamma
-NumericVector callrgamma(int n, double shape, double scale);
+Rcpp::NumericVector callrgamma(int n, double shape, double scale);
 RcppExport SEXP _AdaptiveAllocation_callrgamma(SEXP nSEXP, SEXP shapeSEXP, SEXP scaleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -24,29 +36,29 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// rmultinom_1
-IntegerVector rmultinom_1(unsigned int& size, NumericVector& probs, unsigned int& N);
-RcppExport SEXP _AdaptiveAllocation_rmultinom_1(SEXP sizeSEXP, SEXP probsSEXP, SEXP NSEXP) {
+// csample_num
+NumericVector csample_num(NumericVector x, int size, bool replace, NumericVector prob);
+RcppExport SEXP _AdaptiveAllocation_csample_num(SEXP xSEXP, SEXP sizeSEXP, SEXP replaceSEXP, SEXP probSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< unsigned int& >::type size(sizeSEXP);
-    Rcpp::traits::input_parameter< NumericVector& >::type probs(probsSEXP);
-    Rcpp::traits::input_parameter< unsigned int& >::type N(NSEXP);
-    rcpp_result_gen = Rcpp::wrap(rmultinom_1(size, probs, N));
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type size(sizeSEXP);
+    Rcpp::traits::input_parameter< bool >::type replace(replaceSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type prob(probSEXP);
+    rcpp_result_gen = Rcpp::wrap(csample_num(x, size, replace, prob));
     return rcpp_result_gen;
 END_RCPP
 }
-// rmultinom_rcpp
-IntegerMatrix rmultinom_rcpp(unsigned int& n, unsigned int& size, NumericVector& probs);
-RcppExport SEXP _AdaptiveAllocation_rmultinom_rcpp(SEXP nSEXP, SEXP sizeSEXP, SEXP probsSEXP) {
+// diracF
+int diracF(int a, int b);
+RcppExport SEXP _AdaptiveAllocation_diracF(SEXP aSEXP, SEXP bSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< unsigned int& >::type n(nSEXP);
-    Rcpp::traits::input_parameter< unsigned int& >::type size(sizeSEXP);
-    Rcpp::traits::input_parameter< NumericVector& >::type probs(probsSEXP);
-    rcpp_result_gen = Rcpp::wrap(rmultinom_rcpp(n, size, probs));
+    Rcpp::traits::input_parameter< int >::type a(aSEXP);
+    Rcpp::traits::input_parameter< int >::type b(bSEXP);
+    rcpp_result_gen = Rcpp::wrap(diracF(a, b));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -63,60 +75,60 @@ BEGIN_RCPP
 END_RCPP
 }
 // update_allocation
-arma::mat update_allocation(arma::vec pi, double mu, double sigma, arma::vec x);
-RcppExport SEXP _AdaptiveAllocation_update_allocation(SEXP piSEXP, SEXP muSEXP, SEXP sigmaSEXP, SEXP xSEXP) {
+arma::irowvec update_allocation(arma::rowvec pi, arma::vec mu, arma::vec prec, arma::vec x);
+RcppExport SEXP _AdaptiveAllocation_update_allocation(SEXP piSEXP, SEXP muSEXP, SEXP precSEXP, SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type pi(piSEXP);
-    Rcpp::traits::input_parameter< double >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< arma::rowvec >::type pi(piSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type prec(precSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_allocation(pi, mu, sigma, x));
+    rcpp_result_gen = Rcpp::wrap(update_allocation(pi, mu, prec, x));
     return rcpp_result_gen;
 END_RCPP
 }
 // update_pi
-arma::rowvec update_pi(arma::vec alpha, arma::vec N);
+arma::rowvec update_pi(arma::rowvec alpha, arma::irowvec N);
 RcppExport SEXP _AdaptiveAllocation_update_pi(SEXP alphaSEXP, SEXP NSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type alpha(alphaSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< arma::rowvec >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
     rcpp_result_gen = Rcpp::wrap(update_pi(alpha, N));
     return rcpp_result_gen;
 END_RCPP
 }
 // update_mu
-arma::vec update_mu(double mu0, double s0, arma::vec sigma, arma::mat z, arma::vec N, arma::vec x);
-RcppExport SEXP _AdaptiveAllocation_update_mu(SEXP mu0SEXP, SEXP s0SEXP, SEXP sigmaSEXP, SEXP zSEXP, SEXP NSEXP, SEXP xSEXP) {
+arma::vec update_mu(double mu0, double p0, arma::vec prec, arma::irowvec z, arma::irowvec N, arma::vec x);
+RcppExport SEXP _AdaptiveAllocation_update_mu(SEXP mu0SEXP, SEXP p0SEXP, SEXP precSEXP, SEXP zSEXP, SEXP NSEXP, SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< double >::type mu0(mu0SEXP);
-    Rcpp::traits::input_parameter< double >::type s0(s0SEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type sigma(sigmaSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type z(zSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< double >::type p0(p0SEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type prec(precSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_mu(mu0, s0, sigma, z, N, x));
+    rcpp_result_gen = Rcpp::wrap(update_mu(mu0, p0, prec, z, N, x));
     return rcpp_result_gen;
 END_RCPP
 }
-// update_sigma
-arma::vec update_sigma(double a0, double b0, arma::vec mu, arma::mat z, arma::vec N, arma::vec x);
-RcppExport SEXP _AdaptiveAllocation_update_sigma(SEXP a0SEXP, SEXP b0SEXP, SEXP muSEXP, SEXP zSEXP, SEXP NSEXP, SEXP xSEXP) {
+// update_prec
+arma::vec update_prec(double a0, double b0, arma::vec mu, arma::irowvec z, arma::irowvec N, arma::vec x);
+RcppExport SEXP _AdaptiveAllocation_update_prec(SEXP a0SEXP, SEXP b0SEXP, SEXP muSEXP, SEXP zSEXP, SEXP NSEXP, SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< double >::type a0(a0SEXP);
     Rcpp::traits::input_parameter< double >::type b0(b0SEXP);
     Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type z(zSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_sigma(a0, b0, mu, z, N, x));
+    rcpp_result_gen = Rcpp::wrap(update_prec(a0, b0, mu, z, N, x));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -138,14 +150,15 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_AdaptiveAllocation_sum_allocation", (DL_FUNC) &_AdaptiveAllocation_sum_allocation, 2},
     {"_AdaptiveAllocation_callrgamma", (DL_FUNC) &_AdaptiveAllocation_callrgamma, 3},
-    {"_AdaptiveAllocation_rmultinom_1", (DL_FUNC) &_AdaptiveAllocation_rmultinom_1, 3},
-    {"_AdaptiveAllocation_rmultinom_rcpp", (DL_FUNC) &_AdaptiveAllocation_rmultinom_rcpp, 3},
+    {"_AdaptiveAllocation_csample_num", (DL_FUNC) &_AdaptiveAllocation_csample_num, 4},
+    {"_AdaptiveAllocation_diracF", (DL_FUNC) &_AdaptiveAllocation_diracF, 2},
     {"_AdaptiveAllocation_rdirichlet_cpp", (DL_FUNC) &_AdaptiveAllocation_rdirichlet_cpp, 2},
     {"_AdaptiveAllocation_update_allocation", (DL_FUNC) &_AdaptiveAllocation_update_allocation, 4},
     {"_AdaptiveAllocation_update_pi", (DL_FUNC) &_AdaptiveAllocation_update_pi, 2},
     {"_AdaptiveAllocation_update_mu", (DL_FUNC) &_AdaptiveAllocation_update_mu, 6},
-    {"_AdaptiveAllocation_update_sigma", (DL_FUNC) &_AdaptiveAllocation_update_sigma, 6},
+    {"_AdaptiveAllocation_update_prec", (DL_FUNC) &_AdaptiveAllocation_update_prec, 6},
     {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 6},
     {NULL, NULL, 0}
 };

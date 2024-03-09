@@ -6,7 +6,7 @@
 \usage{
 ssg(
   x,
-  hyper = c(0.5, 1, 0, 1, 2, 2),
+  hyper = c(1, 1, 0, 1, 1, 1),
   K = 3,
   iteration = 1000,
   burnin = 50,

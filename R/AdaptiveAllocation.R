@@ -11,7 +11,7 @@
 #' @references TBA
 #'
 #' @docType package
-#' @name AdaptiveAllocation
+#' @name AdAlloc
 #'
 #' @useDynLib AdaptiveAllocation, .registration = TRUE
 # @importFrom Rcpp sourceCpp
