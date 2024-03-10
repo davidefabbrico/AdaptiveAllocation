@@ -143,11 +143,8 @@ arma::vec update_mu(double mu0, double p0, arma::vec prec, arma::irowvec z, arma
   for (int k = 0; k<K; k++) {
     muPost(k) = (prec(k)*sampMean(k)+mu0*p0)/(prec(k)*N(k)+p0);
     precPost(k) = prec(k)*N(k)+p0;
-    // cout << muPost << "\n";
-    // cout << sigmaPost << "\n";
     MuPosteriori(k) = R::rnorm(muPost(k), sqrt(1/precPost(k)));
   }
-  // cout << "Mu: " << MuPosteriori << "\n";
   return MuPosteriori;
 }
 
@@ -168,28 +165,17 @@ arma::vec update_prec(double a0, double b0, arma::vec mu, arma::irowvec z, arma:
   // cout << "Medie: " << mu << "\n";
   for (int k = 0; k<K; k++) {
     for (int i = 0; i<n; i++) {
-      // cout << "Power 2: " << pow((x(i)-mu(k)), 2) << "Membro: " << diracF(z(i), k) << "\n";
-      // sumNum(k) = sumNum(k) + diracF(z(i), k)*pow(x(i)-mu(k), 2);
-      // cout << z(i) << k << diracF(z(i), k) << "\n";
-      // cout << diracF(z(i), k)*pow((x(i)-mu(k)), 2) << "\n";
-      if (z(i) == k) {
-        // cout << "Cluster " << k << ": \n" << pow(x(i)-mu(k), 2) << "\n";
-        sumNum(k) = sumNum(k) + pow(x(i)-mu(k), 2)/2;
-      }
+      sumNum(k) = sumNum(k) + diracF(z(i), k)*pow(x(i)-mu(k), 2);
     }
-    // cout << "Somma Numeratore: \n" << sumNum(k) << "\n";
   }
   arma::vec shape(K);
   arma::vec scale(K);
   for (int k = 0; k<K; k++) {
     shape(k) = a0+(N(k)/2);
     // compute the sum
-    scale(k) = b0+sumNum(k);
-    // cout << "Shape: " << shape << "\n";
-    // cout << "Scale: " << scale << "\n";
+    scale(k) = b0+sumNum(k)/2;
     prec(k) = callrgamma(1, shape(k), 1/scale(k))(0);
   }
-  // cout << "Prec: " << prec << "\n";
   return prec;
 }
 
@@ -244,33 +230,16 @@ List SSG(arma::vec x, arma::vec hyper, int K, int iteration, int burnin, int thi
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
     // update z
-    // cout << "Allocation Matrix 1: " << z;
     z = update_allocation(pi, mu, prec, x);
-    // cout << "Allocation Matrix: " << z;
-    // cout << "allocation: " << z;
-    // cout << "mu: " << mu;
-    // cout << "sigma: " << sigma;
     // compute N
     arma::irowvec N = sum_allocation(z, K);
-    // cout << "N: " << N << "\n";
     // update pi
-    // cout << "Pi 1: " << pi << "\n";
     pi = update_pi(concPar.t(), N);
-    // cout << "Pi: " << pi << "\n";
     // update params
     // mu
-    // cout << "Mu 1: " << mu << "\n";
     mu = update_mu(hyper(2), hyper(3), prec, z, N, x);
-    // cout << "Mu: " << mu << "\n";
-    // sigma
-    // cout << "Sigma 1: " << sigma << "\n";
+    // precision
     prec = update_prec(hyper(4), hyper(5), mu, z, N, x); 
-    // cout << "Sigma: " << sigma << "\n";
-    // arma::irowvec N = sum_allocation(z);
-    // pi = update_pi(concPar.t(), N);
-    // sigma = update_sigma(hyper(4), hyper(5), mu, z, N, x);
-    // mu = update_mu(hyper(2), hyper(3), sigma, z, N, x);
-    // z = update_allocation(pi, mu, sigma, x);
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
