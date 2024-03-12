@@ -10,6 +10,13 @@ using namespace Rcpp;
 using namespace arma;
 using namespace std;
 
+// TODO
+// [ ] Pointers?
+// [ ] data in d-dimension
+// [ ] Random Gibbs sampler
+// [ ] Code Optimization
+// [ ] Entropy-Giuded Adaptive Gibbs sampler 
+
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
 // zi | pi1, ..., piK è una Multinomiale, da cui non sappiamo ancora campionare
@@ -151,7 +158,7 @@ arma::vec update_mu(double mu0, double p0, arma::vec prec, arma::irowvec z, arma
 
 // FCD sigma
 // [[Rcpp::export]]
-arma::vec update_prec(double a0, double b0, arma::vec mu, arma::irowvec z, arma::irowvec N, arma::vec x) {
+arma::vec update_prec(double a0, double b0, arma::vec mu, arma::irowvec z, arma::irowvec N, arma::vec x, string methods = "random") {
   // a0 iperparametro a priori della inverse gamma
   // b0 iperparametro a priori della inverse gamma
   // mu vettore delle medie a posteriori
