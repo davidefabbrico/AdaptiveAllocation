@@ -158,7 +158,7 @@ arma::vec update_mu(double mu0, double p0, arma::vec prec, arma::irowvec z, arma
 
 // FCD sigma
 // [[Rcpp::export]]
-arma::vec update_prec(double a0, double b0, arma::vec mu, arma::irowvec z, arma::irowvec N, arma::vec x, string methods = "random") {
+arma::vec update_prec(double a0, double b0, arma::vec mu, arma::irowvec z, arma::irowvec N, arma::vec x) {
   // a0 iperparametro a priori della inverse gamma
   // b0 iperparametro a priori della inverse gamma
   // mu vettore delle medie a posteriori
@@ -270,8 +270,3 @@ List SSG(arma::vec x, arma::vec hyper, int K, int iteration, int burnin, int thi
                       Named("Precision") = PREC,
                       Named("Execution_Time") = duration/1000000);
 }
-
-
-
-
-
