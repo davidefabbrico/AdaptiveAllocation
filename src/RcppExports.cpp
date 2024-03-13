@@ -148,6 +148,68 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// update_allocationD
+arma::irowvec update_allocationD(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X);
+RcppExport SEXP _AdaptiveAllocation_update_allocationD(SEXP piSEXP, SEXP muSEXP, SEXP precSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::rowvec >::type pi(piSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_allocationD(pi, mu, prec, X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// update_muD
+arma::vec update_muD(arma::vec mu0, arma::mat p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X);
+RcppExport SEXP _AdaptiveAllocation_update_muD(SEXP mu0SEXP, SEXP p0SEXP, SEXP precSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type mu0(mu0SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type p0(p0SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_muD(mu0, p0, prec, z, N, X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// update_precD
+arma::mat update_precD(double a0, double b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X);
+RcppExport SEXP _AdaptiveAllocation_update_precD(SEXP a0SEXP, SEXP b0SEXP, SEXP muSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type a0(a0SEXP);
+    Rcpp::traits::input_parameter< double >::type b0(b0SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_precD(a0, b0, mu, z, N, X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// DSSG
+List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin);
+RcppExport SEXP _AdaptiveAllocation_DSSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper(hyperSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
+    rcpp_result_gen = Rcpp::wrap(DSSG(X, hyper, K, iteration, burnin, thin));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_sum_allocation", (DL_FUNC) &_AdaptiveAllocation_sum_allocation, 2},
@@ -160,6 +222,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_update_mu", (DL_FUNC) &_AdaptiveAllocation_update_mu, 6},
     {"_AdaptiveAllocation_update_prec", (DL_FUNC) &_AdaptiveAllocation_update_prec, 6},
     {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 6},
+    {"_AdaptiveAllocation_update_allocationD", (DL_FUNC) &_AdaptiveAllocation_update_allocationD, 4},
+    {"_AdaptiveAllocation_update_muD", (DL_FUNC) &_AdaptiveAllocation_update_muD, 6},
+    {"_AdaptiveAllocation_update_precD", (DL_FUNC) &_AdaptiveAllocation_update_precD, 6},
+    {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 6},
     {NULL, NULL, 0}
 };
 

@@ -41,3 +41,19 @@ SSG <- function(x, hyper, K, iteration, burnin, thin) {
     .Call(`_AdaptiveAllocation_SSG`, x, hyper, K, iteration, burnin, thin)
 }
 
+update_allocationD <- function(pi, mu, prec, X) {
+    .Call(`_AdaptiveAllocation_update_allocationD`, pi, mu, prec, X)
+}
+
+update_muD <- function(mu0, p0, prec, z, N, X) {
+    .Call(`_AdaptiveAllocation_update_muD`, mu0, p0, prec, z, N, X)
+}
+
+update_precD <- function(a0, b0, mu, z, N, X) {
+    .Call(`_AdaptiveAllocation_update_precD`, a0, b0, mu, z, N, X)
+}
+
+DSSG <- function(X, hyper, K, iteration, burnin, thin) {
+    .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin)
+}
+
