@@ -44,12 +44,12 @@ is what `AdaptiveAllocation::ssg()` do.
 library(AdaptiveAllocation)
 
 # Generate synthetic data
-rmix = function(n, pi, mu, s){
-  z = sample(1:length(pi), prob = pi, size = n, replace=TRUE)
-  x = rnorm(n, mu[z], s[z])
+rmix <- function(n, pi, mu, s){
+  z <- sample(1:length(pi), prob = pi, size = n, replace=TRUE)
+  x <- rnorm(n, mu[z], s[z])
   return(x)
 }
-x = rmix(n = 1000, pi = c(0.5, 0.5), mu = c(-2, 2), s = c(1, 1))
+x <- rmix(n = 1000, pi = c(0.5, 0.5), mu = c(-2, 2), s = c(1, 1))
 # hist(x)
 
 # Run the Adaptive Allocation 
