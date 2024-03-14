@@ -37,12 +37,25 @@ functions in the R package `AdaptiveAllocation` work.
 The R package contains various functions that are designed to perform
 specific tasks. To showcase the functionality, we will go through a
 simple example that illustrates the use of one of these functions. This
-is what `AdaptiveAllocation::ssg()` do.
+is what `AdaptiveAllocation::contPlot2d()`, `AdaptiveAllocation::ssg()` and  `AdaptiveAllocation::ssg()` do.
 
 ``` r
 # Load the R package
 library(AdaptiveAllocation)
 
+# Generate synthetic data
+data <- AdaptiveAllocation::genGM(n = 100, K = 3, d = 2)
+
+# If d = 2 you can plot the generated mixture model
+plotCluster <- AdaptiveAllocation::contPlot2d(data = data[[1]])
+print(plotCluster)
+
+# Run the Adaptive Allocation 
+res <- AdaptiveAllocation::ssgd(as.matrix(data[[1]]), K = 3, hyper = c(1, 1, 0, 0.1, 1, 1))
+
+
+
+# For 1-dimensional gaussian data there is also a specific function
 # Generate synthetic data
 rmix <- function(n, pi, mu, s){
   z <- sample(1:length(pi), prob = pi, size = n, replace=TRUE)
