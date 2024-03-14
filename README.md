@@ -37,7 +37,8 @@ functions in the R package `AdaptiveAllocation` work.
 The R package contains various functions that are designed to perform
 specific tasks. To showcase the functionality, we will go through a
 simple example that illustrates the use of one of these functions. This
-is what `AdaptiveAllocation::contPlot2d()`, `AdaptiveAllocation::ssg()` and  `AdaptiveAllocation::ssg()` do.
+is what `AdaptiveAllocation::genGM`, `AdaptiveAllocation::contPlot2d()`, 
+`AdaptiveAllocation::ssg()` and  `AdaptiveAllocation::ssg()` do.
 
 ``` r
 # Load the R package
