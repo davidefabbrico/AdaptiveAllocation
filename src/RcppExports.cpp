@@ -163,13 +163,13 @@ BEGIN_RCPP
 END_RCPP
 }
 // update_muD
-arma::vec update_muD(arma::vec mu0, arma::mat p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X);
+arma::mat update_muD(double mu0, double p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X);
 RcppExport SEXP _AdaptiveAllocation_update_muD(SEXP mu0SEXP, SEXP p0SEXP, SEXP precSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type mu0(mu0SEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type p0(p0SEXP);
+    Rcpp::traits::input_parameter< double >::type mu0(mu0SEXP);
+    Rcpp::traits::input_parameter< double >::type p0(p0SEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
@@ -195,8 +195,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // DSSG
-List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin);
-RcppExport SEXP _AdaptiveAllocation_DSSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP) {
+List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method);
+RcppExport SEXP _AdaptiveAllocation_DSSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -206,7 +206,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
     Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
-    rcpp_result_gen = Rcpp::wrap(DSSG(X, hyper, K, iteration, burnin, thin));
+    Rcpp::traits::input_parameter< String >::type method(methodSEXP);
+    rcpp_result_gen = Rcpp::wrap(DSSG(X, hyper, K, iteration, burnin, thin, method));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -225,7 +226,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_update_allocationD", (DL_FUNC) &_AdaptiveAllocation_update_allocationD, 4},
     {"_AdaptiveAllocation_update_muD", (DL_FUNC) &_AdaptiveAllocation_update_muD, 6},
     {"_AdaptiveAllocation_update_precD", (DL_FUNC) &_AdaptiveAllocation_update_precD, 6},
-    {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 6},
+    {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 7},
     {NULL, NULL, 0}
 };
 

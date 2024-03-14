@@ -5,8 +5,8 @@
 \title{dssg}
 \usage{
 ssgd(
-  x,
-  hyper = c(1, 1, 0, 1, 1, 1),
+  X,
+  hyper = c(1, 1, 0, 0.1, 1, 1),
   K = 3,
   iteration = 1000,
   burnin = 50,

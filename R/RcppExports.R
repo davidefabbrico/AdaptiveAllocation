@@ -53,7 +53,7 @@ update_precD <- function(a0, b0, mu, z, N, X) {
     .Call(`_AdaptiveAllocation_update_precD`, a0, b0, mu, z, N, X)
 }
 
-DSSG <- function(X, hyper, K, iteration, burnin, thin) {
-    .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin)
+DSSG <- function(X, hyper, K, iteration, burnin, thin, method) {
+    .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin, method)
 }
 

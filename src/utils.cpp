@@ -11,11 +11,18 @@ using namespace arma;
 using namespace std;
 
 // TODO
-// [ ] Pointers?
-// [ ] data in d-dimension
+// [X] data in d-dimension
+// [X] How to set the Hyperparameters?
+// From Bayesian Regularization for Normal Mixture Estimation and Model-Based Clustering 
+// by Fraley and Raftery page 159-160. We have 4 more hyperparameters:
+// 1. mu ~ N(muP, sigma^2/kP)
+// 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2)
+// for the mean the mean of the data. kP = 0.01
+// vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
+// [ ] How to summarize the posterior?
 // [ ] Random Gibbs sampler
-// [ ] Code Optimization
 // [ ] Entropy-Giuded Adaptive Gibbs sampler 
+// [ ] Code Optimization
 
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
@@ -327,7 +334,7 @@ arma::irowvec update_allocationD(arma::rowvec pi, arma::mat mu, arma::mat prec, 
 
 // FCD mu
 // [[Rcpp::export]]
-arma::vec update_muD(arma::vec mu0, arma::mat p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X) {
+arma::mat update_muD(double mu0, double p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X) {
   // La struttura è la seguente: un vettore media per ogni cluster e una matrice precisione
   // per ogni cluster. Dato che assumiamo indipendenza possiamo mettere la diagonale
   // all'interno di una matrice Kxd
@@ -343,6 +350,10 @@ arma::vec update_muD(arma::vec mu0, arma::mat p0, arma::mat prec, arma::irowvec 
   arma::mat muPost(K, d);
   arma::mat precPost(K, d);
   arma::mat sampMean(K, d);
+  // Prior Setting (potrei anche non fare questa specifica, guardare precisione)
+  arma::mat muPrior = mu0 * arma::ones<arma::mat>(K, d);
+  arma::mat pPrior = p0 * arma::ones<arma::mat>(K, d);
+  
   for (int k = 0; k<K; k++) {
     for (int j = 0; j<d; j++) {
       for (int i = 0; i<n; i++) {
@@ -350,13 +361,15 @@ arma::vec update_muD(arma::vec mu0, arma::mat p0, arma::mat prec, arma::irowvec 
       }
     }
   }
+  
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      muPost(k,j) = (prec(k,j)*sampMean(k,j)+mu0(j,k)*p0(j,k))/(prec(k,j)*N(k)+p0(j,k));
-      precPost(k,j) = prec(k,j)*N(k)+p0(k,j);
+      muPost(k,j) = (prec(k,j)*sampMean(k,j)+muPrior(k,j)*pPrior(k,j))/(prec(k,j)*N(k)+pPrior(k,j));
+      precPost(k,j) = prec(k,j)*N(k)+pPrior(k,j);
       MuPosteriori(k,j) = R::rnorm(muPost(k,j), sqrt(1/precPost(k,j)));
     }
   }
+  
   return MuPosteriori;
 }
 
@@ -397,13 +410,14 @@ arma::mat update_precD(double a0, double b0, arma::mat mu, arma::irowvec z, arma
 
 // Gibbs sampler d-dimension
 // [[Rcpp::export]]
-List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin) {
+List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method) {
   auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
   ///////////////////////////////////////////////////
   int nout = (iteration-burnin)/thin;
-  int n = X.n_rows;
+  int n = X.n_rows; // number of rows
+  int d = X.n_cols; // number of columns
   NumericVector indC(K);
   for (int k = 0; k<K; k++) {
     indC(k) = k;
@@ -434,51 +448,56 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   arma::vec concPar = hyper(1) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
   // MU
- // arma::vec mu(K);
- // for (int k = 0; k<K; k++) {
- //   mu(k) = R::rnorm(hyper(2), 1/sqrt(hyper(3)));
- // }
- // // PRECISION
- // arma::vec prec(K);
- // prec = callrgamma(K, hyper(4), 1/hyper(5));
- // ////////////////////////////////////////////////////
- // /////////////////// Main Part /////////////////////
- // ///////////////////////////////////////////////////
- // for (int t = 0; t<iteration; t++) {
- //   // update z
- //   z = update_allocation(pi, mu, prec, x);
- //   // compute N
- //   arma::irowvec N = sum_allocation(z, K);
- //   // update pi
- //   pi = update_pi(concPar.t(), N);
- //   // update params
- //   // mu
- //   mu = update_mu(hyper(2), hyper(3), prec, z, N, x);
- //   // precision
- //   prec = update_prec(hyper(4), hyper(5), mu, z, N, x); 
- //   ////////////////////////////////////////////////////
- //   ///////////////// Store Results ///////////////////
- //   ///////////////////////////////////////////////////
- //   if(t%thin == 0 && t > burnin-1) {
- //     Z.row(idx) = z;
- //     PI.row(idx) = pi;
- //     MU.row(idx) = mu.t();
- //     PREC.row(idx) = prec.t();
- //     idx = idx + 1;
- //   }
- //   if (t%1000 == 0 && t > 0) {
- //     std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
- //   }
- // }
- // std::cout << "End MCMC!\n";
- // auto stop = std::chrono::high_resolution_clock::now();
- // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
- // return List::create(Named("Allocation") = Z,
- //                     Named("Proportion_Parameters") = PI,
- //                     Named("Mu") = MU,
- //                     Named("Precision") = PREC,
- //                     Named("Execution_Time") = duration/1000000);
- return 0;
+  arma::mat mu(K, d);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      mu(k,j) = R::rnorm(hyper(2), 1/sqrt(hyper(3)));
+    }
+  }
+  // PRECISION
+  arma::mat prec(K, d);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      prec(k,j) = callrgamma(1, hyper(4), 1/hyper(5))(0);
+    }
+  }
+  ////////////////////////////////////////////////////
+  /////////////////// Main Part /////////////////////
+  ///////////////////////////////////////////////////
+  for (int t = 0; t<iteration; t++) {
+    // update z
+    z = update_allocationD(pi, mu, prec, X);
+    // compute N
+    arma::irowvec N = sum_allocation(z, K);
+    // update pi
+    pi = update_pi(concPar.t(), N);
+    // update params
+    // mu
+    mu = update_muD(hyper(2), hyper(3), prec, z, N, X);
+    // precision
+    prec = update_precD(hyper(4), hyper(5), mu, z, N, X);
+    ////////////////////////////////////////////////////
+    ///////////////// Store Results ///////////////////
+    ///////////////////////////////////////////////////
+    if(t%thin == 0 && t > burnin-1) {
+      Z.row(idx) = z;
+      PI.row(idx) = pi;
+      MU[idx] = mu;
+      PREC[idx] = prec;
+      idx = idx + 1;
+    }
+    if (t%1000 == 0 && t > 0) {
+      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    }
+  }
+  std::cout << "End MCMC!\n";
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  return List::create(Named("Allocation") = Z,
+                      Named("Proportion_Parameters") = PI,
+                      Named("Mu") = MU,
+                      Named("Precision") = PREC,
+                      Named("Execution_Time") = duration/1000000);
   
 }
 

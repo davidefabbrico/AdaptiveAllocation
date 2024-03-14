@@ -22,4 +22,6 @@
 #' @import Rcpp
 #' @import stats 
 #' @import mltools
+#' @import MASS
+#' @import ggplot2
 NULL
