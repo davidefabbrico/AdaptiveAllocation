@@ -68,8 +68,8 @@ x <- rmix(n = 1000, pi = c(0.5, 0.5), mu = c(-2, 2), s = c(1, 1))
 # hist(x)
 
 # Run the Systematic Gibbs Sampler for 1-dimensional data
-res <- AdaptiveAllocation::ssg(x, hyper = c(1, 1, 0, 0.1, 1, 1), K = 2,
-                                iteration = 10000, thin = 20, burnin = 500)
+res <- AdaptiveAllocation::ssg(x, hyper = c(1, 1, 0, 0.1, 1, 1), K = 2)
+                                
 
 
 
