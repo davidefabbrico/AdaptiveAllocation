@@ -20,7 +20,7 @@ using namespace std;
 // for the mean the mean of the data. kP = 0.01
 // vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
 // [ ] How to summarize the posterior?
-// [ ] Random Gibbs sampler
+// [X] Random Gibbs sampler
 // [ ] Entropy-Giuded Adaptive Gibbs sampler 
 // [ ] Code Optimization
 
@@ -334,7 +334,7 @@ arma::irowvec update_allocationD(arma::rowvec pi, arma::mat mu, arma::mat prec, 
 
 // FCD mu
 // [[Rcpp::export]]
-arma::mat update_muD(double mu0, double p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X) {
+arma::mat update_muD(arma::rowvec mu0, double p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X) {
   // La struttura è la seguente: un vettore media per ogni cluster e una matrice precisione
   // per ogni cluster. Dato che assumiamo indipendenza possiamo mettere la diagonale
   // all'interno di una matrice Kxd
@@ -350,8 +350,11 @@ arma::mat update_muD(double mu0, double p0, arma::mat prec, arma::irowvec z, arm
   arma::mat muPost(K, d);
   arma::mat precPost(K, d);
   arma::mat sampMean(K, d);
-  // Prior Setting (potrei anche non fare questa specifica, guardare precisione)
-  arma::mat muPrior = mu0 * arma::ones<arma::mat>(K, d);
+  // Prior Setting (tutti i cluster partono con la stessa hyperpriori per la media)
+  arma::mat muPrior(K, d);
+  for (int k = 0; k<K; k++) {
+    muPrior.row(k) = mu0;
+  }
   arma::mat pPrior = p0 * arma::ones<arma::mat>(K, d);
   
   for (int k = 0; k<K; k++) {
@@ -376,7 +379,7 @@ arma::mat update_muD(double mu0, double p0, arma::mat prec, arma::irowvec z, arm
 
 // FCD sigma
 // [[Rcpp::export]]
-arma::mat update_precD(double a0, double b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X) {
+arma::mat update_precD(double a0, arma::rowvec b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X) {
   // a0 iperparametro a priori della inverse gamma
   // b0 iperparametro a priori della inverse gamma
   // mu vettore delle medie a posteriori
@@ -400,7 +403,7 @@ arma::mat update_precD(double a0, double b0, arma::mat mu, arma::irowvec z, arma
     for (int k = 0; k<K; k++) {
       double shape = a0+(N(k)/2);
       // compute the sum
-      double scale = b0+sumNum(k,j)/2;
+      double scale = b0(j)+sumNum(k,j)/2;
       prec(k,j) = callrgamma(1, shape, 1/scale)(0);
     }
   }
@@ -411,6 +414,7 @@ arma::mat update_precD(double a0, double b0, arma::mat mu, arma::irowvec z, arma
 // Gibbs sampler d-dimension
 // [[Rcpp::export]]
 List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method) {
+  // precision and not variance!!
   auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
@@ -432,6 +436,32 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   // SIGMA
   List PREC(nout);
   ////////////////////////////////////////////////////
+  ////////// Emprical bayes prior settings ///////////
+  ///////////////////////////////////////////////////
+  arma::rowvec hyper_mu_mean(d);
+  arma::rowvec hyper_prec_b(d);
+  double hyper_mu_var;
+  double hyper_prec_a;
+  if (method == "EB") {
+    hyper_mu_mean = mean(X, 0);
+    hyper_mu_var = (1/hyper(3))/0.01; // 1/sigma/kp
+    if (hyper_mu_var >= 14) {
+      cout << "Stability Problem... Set a higher precision!" << "\n";
+    }
+    hyper_prec_a = d + 2;
+    hyper_prec_b = (var(X, 0)/d)/(pow(K, 2/d));
+  } else {
+    for (int j = 0; j<d; j++) {
+      hyper_mu_mean(j) = hyper(2);
+    }
+    for (int j = 0; j<d; j++) {
+      hyper_prec_b(j) = hyper(5);
+    }
+    hyper_mu_var = hyper(3);
+    hyper_prec_a = hyper(4);
+  }
+  
+  ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
   // Z
@@ -451,14 +481,14 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   arma::mat mu(K, d);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      mu(k,j) = R::rnorm(hyper(2), 1/sqrt(hyper(3)));
+      mu(k,j) = R::rnorm(hyper_mu_mean(j), hyper_mu_var);
     }
   }
   // PRECISION
   arma::mat prec(K, d);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      prec(k,j) = callrgamma(1, hyper(4), 1/hyper(5))(0);
+      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b(j))(0);
     }
   }
   ////////////////////////////////////////////////////
@@ -473,9 +503,9 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
     pi = update_pi(concPar.t(), N);
     // update params
     // mu
-    mu = update_muD(hyper(2), hyper(3), prec, z, N, X);
+    mu = update_muD(hyper_mu_mean, hyper_mu_var, prec, z, N, X);
     // precision
-    prec = update_precD(hyper(4), hyper(5), mu, z, N, X);
+    prec = update_precD(hyper_prec_a, hyper_prec_b, mu, z, N, X);
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
@@ -502,4 +532,189 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
 }
 
 
+
+////////////////////////////////////////////////////
+////////////// Random Gibbs Sampler ///////////////
+///////////////////////////////////////////////////
+
+// [[Rcpp::export]]
+arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha) {
+  // pi sono le proporzioni di ogni cluster
+  // mu è la media a posteriori
+  // sigma è la varianza a posteriori
+  // x dati
+  // m sono quanti ne voglio aggiornare
+  // z è il "vecchio" vettore di allocazione per ogni individuo
+  int K = pi.n_elem; // numero di cluster
+  int n = X.n_rows;
+  int d = X.n_cols; // numero di covariate
+  arma::vec vecTmp(d);
+  NumericMatrix probAllocation(n, K);
+  NumericVector indI(n);
+  for (int i = 0; i<n; i++) {
+    indI(i) = i;
+  }
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
+  NumericVector rI(m);
+  rI = csample_num(indI, m, false, alpha); // without replace
+  for (int i = 0; i<m; i++) {
+    for (int k = 0; k<K; k++) {
+      arma::vec vecTmp = arma::zeros<arma::vec>(d);
+      for (int j = 0; j<d; j++) {
+        vecTmp(j) = R::dnorm(X(rI[i],j), mu(k,j), sqrt(1/prec(k,j)), FALSE);
+      }
+      probAllocation(rI[i],k) = pi(k)*myProduct(vecTmp);
+    }
+  }
+  // normalizzo le righe
+  for (int i = 0; i<m; i++) {
+    probAllocation(rI[i], _) = probAllocation(rI[i], _) / sum(probAllocation(rI[i], _));
+  }
+  // cout << "Probability Matrix Allocation: " << probCluster;
+  for (int i = 0; i<m; i++) {
+    z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
+  }
+  return(z);
+}
+
+
+// Random Gibbs sampler d-dimensional
+// [[Rcpp::export]]
+List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method) {
+  // precision and not variance!!
+  // m: how many observation I want to update
+  auto start = std::chrono::high_resolution_clock::now();
+  ////////////////////////////////////////////////////
+  ////////////////// Initial settings ///////////////
+  ///////////////////////////////////////////////////
+  int nout = (iteration-burnin)/thin;
+  int n = X.n_rows; // number of rows
+  int d = X.n_cols; // number of columns
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
+  int idx = 0;
+  // Z
+  arma::imat Z(nout, n);
+  // PI
+  arma::mat PI(nout, K);
+  // MU
+  List MU(nout);
+  // SIGMA
+  List PREC(nout);
+  ////////////////////////////////////////////////////
+  /////////////// Random Gibbs Sampler ///////////////
+  ///////////////////////////////////////////////////
+  // Alpha weight
+  NumericVector alpha(n); // in this case the weights are setting equally to 1/n
+  for (int i = 0; i<n; i++) {
+    alpha(i) = 1.0/n;
+  }
+  ////////////////////////////////////////////////////
+  ////////// Emprical bayes prior settings ///////////
+  ///////////////////////////////////////////////////
+  arma::rowvec hyper_mu_mean(d);
+  arma::rowvec hyper_prec_b(d);
+  double hyper_mu_var;
+  double hyper_prec_a;
+  if (method == "EB") {
+    hyper_mu_mean = mean(X, 0);
+    hyper_mu_var = (1/hyper(3))/0.01; // 1/sigma/kp
+    if (hyper_mu_var >= 14) {
+      cout << "Stability Problem... Set a higher precision!" << "\n";
+    }
+    hyper_prec_a = d + 2;
+    hyper_prec_b = (var(X, 0)/d)/(pow(K, 2/d));
+  } else { 
+    for (int j = 0; j<d; j++) {
+      hyper_mu_mean(j) = hyper(2);
+    } 
+    for (int j = 0; j<d; j++) {
+      hyper_prec_b(j) = hyper(5);
+    } 
+    hyper_mu_var = hyper(3);
+    hyper_prec_a = hyper(4);
+  }
+  ////////////////////////////////////////////////////
+  ////////////////// Initial value //////////////////
+  ///////////////////////////////////////////////////
+  // Z
+  arma::irowvec z(n);
+  NumericVector probC(K);
+  for (int k = 0; k<K; k++) {
+    probC(k) = hyper(0)/K;
+  }
+  for (int i = 0; i<n; i++) {
+    z(i) = csample_num(indC, 1, true, probC)(0);
+  }
+  // PI
+  arma::rowvec pi(K);
+  arma::vec concPar = hyper(1) * arma::ones<arma::vec>(K);
+  pi = rdirichlet_cpp(1, concPar);
+  // MU
+  arma::mat mu(K, d);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      mu(k,j) = R::rnorm(hyper_mu_mean(j), hyper_mu_var);
+    }
+  }
+  // PRECISION
+  arma::mat prec(K, d);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b(j))(0);
+    }
+  }
+  // Store allocation
+  List allocation(2);
+  // Probability Matrix
+  NumericMatrix probAllocation(n, K);
+  for (int i = 0; i<n; i++) {
+    for (int k = 0; k<K; k++) {
+      probAllocation(i,k) = 1.0/K;
+    }
+  }
+  ////////////////////////////////////////////////////
+  /////////////////// Main Part /////////////////////
+  ///////////////////////////////////////////////////
+  for (int t = 0; t<iteration; t++) {
+    // update probability matrix allocation and z
+    z = update_allocationRD(pi, mu, prec, X, m, z, alpha);
+    // compute N
+    arma::irowvec N = sum_allocation(z, K);
+    // update pi
+    pi = update_pi(concPar.t(), N);
+    // update params
+    // mu
+    mu = update_muD(hyper_mu_mean, hyper_mu_var, prec, z, N, X);
+    // precision
+    prec = update_precD(hyper_prec_a, hyper_prec_b, mu, z, N, X);
+    ////////////////////////////////////////////////////
+    ///////////////// Store Results ///////////////////
+    ///////////////////////////////////////////////////
+    if(t%thin == 0 && t > burnin-1) {
+      Z.row(idx) = z;
+      PI.row(idx) = pi;
+      MU[idx] = mu;
+      PREC[idx] = prec;
+      idx = idx + 1;
+    }
+    if (t%1000 == 0 && t > 0) {
+      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    }
+  }
+  std::cout << "End MCMC!\n";
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  return List::create(Named("Allocation") = Z,
+                      Named("Proportion_Parameters") = PI,
+                      Named("Mu") = MU,
+                      Named("Precision") = PREC,
+                      Named("Execution_Time") = duration/1000000);
+  
+}
 

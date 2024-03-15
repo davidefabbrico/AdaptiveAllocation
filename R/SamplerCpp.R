@@ -3,7 +3,7 @@
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-ssg <- function(x, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5) {
+ssg <- function(x, hyper = c(1, 1, 0, 10, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5) {
   # unidimensional gaussian data
   res <- SSG(as.vector(x), as.vector(hyper), as.integer(K),
              as.integer(iteration), as.integer(burnin), as.integer(thin))
@@ -15,7 +15,7 @@ ssg <- function(x, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, iteration = 1000, burni
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-ssgd <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5) {
+ssgd <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5, method = "EB") {
   # Hyperparameters description:
   # 1 concPar Dirichlet
   # 2 categorical
@@ -24,7 +24,18 @@ ssgd <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, iteration = 1000, burn
   # 5 a0 gamma
   # 6 b0 gamma
   # d-dimensional gaussian data
-  res <- DSSG(as.matrix(X), as.vector(hyperP), as.integer(K),
-             as.integer(iteration), as.integer(burnin), as.integer(thin))
+  res <- DSSG(as.matrix(X), as.vector(hyper), as.integer(K),
+             as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method))
+  return(res)
+}
+
+#' rssg
+#' 
+#' @export
+
+##### ------------------------------------------------------------------ ######
+rssg <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, m, iteration = 1000, burnin = 50, thin = 5, method = "EB") {
+  res <- RSSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
+              as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method))
   return(res)
 }

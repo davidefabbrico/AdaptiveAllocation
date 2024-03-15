@@ -16,7 +16,6 @@ genGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
   return(list(data, matMean, precMat))
 }
 
-
 #' 2d Contour Plot
 #'
 #' @export

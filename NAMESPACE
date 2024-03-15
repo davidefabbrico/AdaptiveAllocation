@@ -2,6 +2,7 @@
 
 export(contPlot2d)
 export(genGM)
+export(rssg)
 export(ssg)
 export(ssgd)
 import(MASS)

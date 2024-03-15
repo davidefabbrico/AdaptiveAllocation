@@ -10,7 +10,8 @@ ssgd(
   K = 3,
   iteration = 1000,
   burnin = 50,
-  thin = 5
+  thin = 5,
+  method = "EB"
 )
 }
 \description{
