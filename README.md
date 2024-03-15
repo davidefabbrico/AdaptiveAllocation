@@ -55,8 +55,7 @@ print(plotCluster)
 res <- AdaptiveAllocation::ssgd(as.matrix(data[[1]]), K = 3, hyper = c(1, 1, 0, 0.1, 1, 1))
 
 # Run the d-dimensional data Random Gibbs Sampler 
-res <- AdaptiveAllocation::rssg(as.matrix(data[[1]]), K = 2, m = 100, hyper = c(1, 1, 0, 20, 1, 1), 
-                                method = "EB", iteration = 10000)
+res <- AdaptiveAllocation::rssg(as.matrix(data[[1]]), K = 2, m = 100, hyper = c(1, 1, 0, 20, 1, 1))
 
 # For 1-dimensional gaussian data there is also a specific function for the systematic gibbs sampler
 # Generate synthetic data
