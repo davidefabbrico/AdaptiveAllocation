@@ -51,12 +51,14 @@ data <- AdaptiveAllocation::genGM(n = 100, K = 3, d = 2)
 plotCluster <- AdaptiveAllocation::contPlot2d(data = data[[1]])
 print(plotCluster)
 
-# Run the Adaptive Allocation 
+# Run the d-dimensional data Systematic Gibbs Sampler 
 res <- AdaptiveAllocation::ssgd(as.matrix(data[[1]]), K = 3, hyper = c(1, 1, 0, 0.1, 1, 1))
 
+# Run the d-dimensional data Random Gibbs Sampler 
+res <- AdaptiveAllocation::rssg(as.matrix(data[[1]]), K = 2, m = 100, hyper = c(1, 1, 0, 20, 1, 1), 
+                                method = "EB", iteration = 10000)
 
-
-# For 1-dimensional gaussian data there is also a specific function
+# For 1-dimensional gaussian data there is also a specific function for the systematic gibbs sampler
 # Generate synthetic data
 rmix <- function(n, pi, mu, s){
   z <- sample(1:length(pi), prob = pi, size = n, replace=TRUE)
@@ -66,6 +68,9 @@ rmix <- function(n, pi, mu, s){
 x <- rmix(n = 1000, pi = c(0.5, 0.5), mu = c(-2, 2), s = c(1, 1))
 # hist(x)
 
-# Run the Adaptive Allocation 
+# Run the Systematic Gibbs Sampler for 1-dimensional data
 res <- AdaptiveAllocation::ssg(x, hyper = c(1, 1, 0, 0.1, 1, 1), K = 2,
                                 iteration = 10000, thin = 20, burnin = 500)
+
+
+
