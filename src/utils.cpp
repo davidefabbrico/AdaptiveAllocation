@@ -21,8 +21,8 @@ using namespace std;
 // vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
 // [X] Random Gibbs sampler
 // [X] Entropy-Giuded Adaptive Gibbs sampler
-// [ ] Check the generating mechanism
-// [ ] Plot with entropy
+// [X] Check the generating mechanism
+// [X] Plot with entropy
 // [ ] How to summarize the posterior?
 // [ ] Code Optimization
 
