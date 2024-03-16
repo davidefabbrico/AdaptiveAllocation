@@ -19,9 +19,11 @@ using namespace std;
 // 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2)
 // for the mean the mean of the data. kP = 0.01
 // vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
-// [ ] How to summarize the posterior?
 // [X] Random Gibbs sampler
-// [ ] Entropy-Giuded Adaptive Gibbs sampler 
+// [X] Entropy-Giuded Adaptive Gibbs sampler
+// [ ] Check the generating mechanism
+// [ ] Plot with entropy
+// [ ] How to summarize the posterior?
 // [ ] Code Optimization
 
 // Modello:
@@ -573,7 +575,6 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
   for (int i = 0; i<m; i++) {
     probAllocation(rI[i], _) = probAllocation(rI[i], _) / sum(probAllocation(rI[i], _));
   }
-  // cout << "Probability Matrix Allocation: " << probCluster;
   for (int i = 0; i<m; i++) {
     z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
   }
@@ -711,6 +712,230 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   return List::create(Named("Allocation") = Z,
+                      Named("Proportion_Parameters") = PI,
+                      Named("Mu") = MU,
+                      Named("Precision") = PREC,
+                      Named("Execution_Time") = duration/1000000);
+  
+}
+
+
+
+////////////////////////////////////////////////////
+////////// Entropy-Guided Gibbs Sampler ///////////
+///////////////////////////////////////////////////
+
+NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X) {
+  int K = pi.n_elem; // numero di cluster
+  int n = X.n_rows; // numero di osservazioni
+  int d = X.n_cols; // numero di covariate
+  NumericMatrix probAllocation(n, K);
+  arma::vec vecTmp(d);
+  // STEP 1. Compute the probability
+  for (int i = 0; i<n; i++) {
+    for (int k = 0; k<K; k++) {
+      arma::vec vecTmp = arma::zeros<arma::vec>(d);
+      for (int j = 0; j<d; j++) {
+        vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1/prec(k,j)), FALSE);
+      }
+      probAllocation(i,k) = pi(k)*myProduct(vecTmp);
+    } 
+  } 
+  // normalizzo le righe
+  for (int i = 0; i<n; i++) {
+    probAllocation(i, _) = probAllocation(i, _) / sum(probAllocation(i, _));
+  }
+  return(probAllocation);
+}
+
+NumericVector entropy(NumericMatrix probAllocation) {
+  int K = probAllocation.ncol(); // numero di cluster
+  int n = probAllocation.nrow(); // numero di osservazioni
+  // STEP 2. Entropy
+  NumericVector Entropy(n);
+  for (int i = 0; i<n; i++) {
+    for (int k = 0; k<K; k++) {
+      Entropy(i) = Entropy(i) + probAllocation(i, k)*log(probAllocation(i, k));
+    }
+    Entropy(i) = -Entropy(i);
+  }
+  // STEP 3. Normalize the entropy
+  for (int i = 0; i<n; i++) {
+    Entropy(i) = Entropy(i) / sum(Entropy);
+  } 
+  return(Entropy);
+}
+
+// [[Rcpp::export]]
+arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma) {
+  // pi sono le proporzioni di ogni cluster
+  // mu è la media a posteriori
+  // sigma è la varianza a posteriori
+  // x dati
+  int K = probAllocation.ncol(); // numero di cluster
+  int n = probAllocation.nrow(); // numero di osservazioni
+  // STEP 4. Update weight
+  NumericVector constVal(n); // in this case the weights are setting equally to 1/n
+  for (int i = 0; i<n; i++) {
+    constVal(i) = 1.0/n;
+  }
+  if (iter == 0) {
+    alpha = constVal; // da capire...
+  } else {
+    alpha = alpha*((iter-1.0)/iter)+(1.0/iter)*(gamma*Entropy+(1-gamma)*constVal);
+  }
+  // Update the allocation
+  NumericVector indI(n);
+  for (int i = 0; i<n; i++) {
+    indI(i) = i;
+  }
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  } 
+  NumericVector rI(m);
+  rI = csample_num(indI, m, false, alpha); // without replace
+  for (int i = 0; i<m; i++) {
+    z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
+  }
+  return(z);
+} 
+
+
+// Random Gibbs sampler d-dimensional
+// [[Rcpp::export]]
+List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma) {
+  // precision and not variance!!
+  // m: how many observation I want to update
+  auto start = std::chrono::high_resolution_clock::now();
+  ////////////////////////////////////////////////////
+  ////////////////// Initial settings ///////////////
+  ///////////////////////////////////////////////////
+  int nout = (iteration-burnin)/thin;
+  int n = X.n_rows; // number of rows
+  int d = X.n_cols; // number of columns
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
+  int idx = 0;
+  // Z
+  arma::imat Z(nout, n);
+  // PI
+  arma::mat PI(nout, K);
+  // Entropy
+  NumericMatrix E(nout, n);
+  // MU
+  List MU(nout);
+  // SIGMA
+  List PREC(nout);
+  ////////////////////////////////////////////////////
+  /////////////// Random Gibbs Sampler ///////////////
+  ///////////////////////////////////////////////////
+  // Alpha weight
+  NumericVector alpha(n); // start from 1/n
+  for (int i = 0; i<n; i++) {
+    alpha(i) = 1.0/n;
+  } 
+  ////////////////////////////////////////////////////
+  ////////// Emprical bayes prior settings ///////////
+  ///////////////////////////////////////////////////
+  arma::rowvec hyper_mu_mean(d);
+  arma::rowvec hyper_prec_b(d);
+  double hyper_mu_var;
+  double hyper_prec_a;
+  if (method == "EB") {
+    hyper_mu_mean = mean(X, 0);
+    hyper_mu_var = (1/hyper(3))/0.01; // 1/sigma/kp
+    if (hyper_mu_var >= 14) {
+      cout << "Stability Problem... Set a higher precision!" << "\n";
+    } 
+    hyper_prec_a = d + 2;
+    hyper_prec_b = (var(X, 0)/d)/(pow(K, 2/d));
+  } else {  
+    for (int j = 0; j<d; j++) {
+      hyper_mu_mean(j) = hyper(2);
+    }  
+    for (int j = 0; j<d; j++) {
+      hyper_prec_b(j) = hyper(5);
+    }  
+    hyper_mu_var = hyper(3);
+    hyper_prec_a = hyper(4);
+  } 
+  ////////////////////////////////////////////////////
+  ////////////////// Initial value //////////////////
+  ///////////////////////////////////////////////////
+  // Z
+  arma::irowvec z(n);
+  NumericVector probC(K);
+  for (int k = 0; k<K; k++) {
+    probC(k) = hyper(0)/K;
+  } 
+  for (int i = 0; i<n; i++) {
+    z(i) = csample_num(indC, 1, true, probC)(0);
+  } 
+  // PI
+  arma::rowvec pi(K);
+  arma::vec concPar = hyper(1) * arma::ones<arma::vec>(K);
+  pi = rdirichlet_cpp(1, concPar);
+  // MU
+  arma::mat mu(K, d);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      mu(k,j) = R::rnorm(hyper_mu_mean(j), hyper_mu_var);
+    }
+  } 
+  // PRECISION
+  arma::mat prec(K, d);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b(j))(0);
+    } 
+  }
+  // Store allocation
+  List allocation(2);
+  // Probability Matrix
+  NumericMatrix probAllocation(n, K);
+  NumericVector Entropy(n);
+  ////////////////////////////////////////////////////
+  /////////////////// Main Part /////////////////////
+  ///////////////////////////////////////////////////
+  for (int t = 0; t<iteration; t++) {
+    // update probability 
+    probAllocation = comp_ProbAlloc(pi, mu, prec, X);
+    // compute entropy
+    Entropy = entropy(probAllocation);
+    // update z
+    z = entropy_allocation(Entropy, probAllocation, m, z, alpha, t, gamma);
+    // compute N
+    arma::irowvec N = sum_allocation(z, K);
+    // update pi
+    pi = update_pi(concPar.t(), N);
+    // update params
+    // mu
+    mu = update_muD(hyper_mu_mean, hyper_mu_var, prec, z, N, X);
+    // precision
+    prec = update_precD(hyper_prec_a, hyper_prec_b, mu, z, N, X);
+    ////////////////////////////////////////////////////
+    ///////////////// Store Results ///////////////////
+    ///////////////////////////////////////////////////
+    if(t%thin == 0 && t > burnin-1) {
+      Z.row(idx) = z;
+      PI.row(idx) = pi;
+      E.row(idx) = Entropy;
+      MU[idx] = mu;
+      PREC[idx] = prec;
+      idx = idx + 1;
+    }
+    if (t%1000 == 0 && t > 0) {
+      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    }
+  }
+  std::cout << "End MCMC!\n";
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  return List::create(Named("Allocation") = Z,
+                      Named("Entropy") = E,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
                       Named("Precision") = PREC,

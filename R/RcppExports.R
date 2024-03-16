@@ -65,3 +65,11 @@ RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method) {
     .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method)
 }
 
+entropy_allocation <- function(Entropy, probAllocation, m, z, alpha, iter, gamma) {
+    .Call(`_AdaptiveAllocation_entropy_allocation`, Entropy, probAllocation, m, z, alpha, iter, gamma)
+}
+
+EntropyGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma) {
+    .Call(`_AdaptiveAllocation_EntropyGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma)
+}
+

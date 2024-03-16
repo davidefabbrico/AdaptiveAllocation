@@ -246,6 +246,42 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// entropy_allocation
+arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma);
+RcppExport SEXP _AdaptiveAllocation_entropy_allocation(SEXP EntropySEXP, SEXP probAllocationSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP, SEXP iterSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type Entropy(EntropySEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
+    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< int >::type iter(iterSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(entropy_allocation(Entropy, probAllocation, m, z, alpha, iter, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
+// EntropyGibbsSamp
+List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma);
+RcppExport SEXP _AdaptiveAllocation_EntropyGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper(hyperSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
+    Rcpp::traits::input_parameter< String >::type method(methodSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(EntropyGibbsSamp(X, hyper, K, m, iteration, burnin, thin, method, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_sum_allocation", (DL_FUNC) &_AdaptiveAllocation_sum_allocation, 2},
@@ -264,6 +300,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 7},
     {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 7},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},
+    {"_AdaptiveAllocation_entropy_allocation", (DL_FUNC) &_AdaptiveAllocation_entropy_allocation, 7},
+    {"_AdaptiveAllocation_EntropyGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_EntropyGibbsSamp, 9},
     {NULL, NULL, 0}
 };
 

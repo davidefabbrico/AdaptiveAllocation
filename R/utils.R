@@ -10,7 +10,7 @@ genGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
     precMat <- diag(d)
     diag(precMat) <- 1/sample(startP:endP, d, replace = TRUE)
     listPrec[[k]] <- precMat
-    cluster <- mvrnorm(n/2, matMean[k,], listPrec[[k]])
+    cluster <- mvrnorm(n/K, matMean[k,], listPrec[[k]]) # n/2
     data <- rbind(data, cluster)
   }
   return(list(data, matMean, precMat))
