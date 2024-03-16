@@ -51,8 +51,11 @@ data <- AdaptiveAllocation::genGM(n = 100, K = 3, d = 2)
 plotCluster <- AdaptiveAllocation::contPlot2d(data = data[[1]])
 print(plotCluster)
 
+# Run the d-dimensional data Adaptive Entropy-Guided Gibbs Sampler 
+res <- AdaptiveAllocation::EntropyGibbs(as.matrix(data[[1]]), K = 3, hyper = c(1, 1, 0, 20, 1, 1))
+
 # Run the d-dimensional data Systematic Gibbs Sampler 
-res <- AdaptiveAllocation::ssgd(as.matrix(data[[1]]), K = 3, hyper = c(1, 1, 0, 0.1, 1, 1))
+res <- AdaptiveAllocation::ssgd(as.matrix(data[[1]]), K = 3, hyper = c(1, 1, 0, 20, 1, 1))
 
 # Run the d-dimensional data Random Gibbs Sampler 
 res <- AdaptiveAllocation::rssg(as.matrix(data[[1]]), K = 2, m = 100, hyper = c(1, 1, 0, 20, 1, 1))
