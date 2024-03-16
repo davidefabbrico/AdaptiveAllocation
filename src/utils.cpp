@@ -23,6 +23,7 @@ using namespace std;
 // [X] Entropy-Giuded Adaptive Gibbs sampler
 // [X] Check the generating mechanism
 // [X] Plot with entropy
+// Emphasise the color
 // [ ] How to summarize the posterior?
 // [ ] Code Optimization
 
