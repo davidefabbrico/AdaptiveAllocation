@@ -7,7 +7,7 @@ Author: Davide Fabbrico
 Maintainer: Who to complain to <davide.fabbrico@unifi.it>
 Description: One paragraph description of what the package does as one or more full sentences.
 License: License: GPL-3 + file LICENSE
-Imports: Rcpp (>= 1.0.12), mltools, MASS, ggplot2
+Imports: Rcpp (>= 1.0.12), mltools, MASS, ggplot2, stats, RColorBrewer
 LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.3.1
 Encoding: UTF-8

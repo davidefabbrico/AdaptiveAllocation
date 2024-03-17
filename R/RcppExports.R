@@ -73,3 +73,7 @@ EntropyGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, ga
     .Call(`_AdaptiveAllocation_EntropyGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma)
 }
 
+summary_Posterior <- function(z) {
+    .Call(`_AdaptiveAllocation_summary_Posterior`, z)
+}
+

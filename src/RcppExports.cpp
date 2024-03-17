@@ -282,6 +282,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// summary_Posterior
+arma::mat summary_Posterior(arma::imat z);
+RcppExport SEXP _AdaptiveAllocation_summary_Posterior(SEXP zSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::imat >::type z(zSEXP);
+    rcpp_result_gen = Rcpp::wrap(summary_Posterior(z));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_sum_allocation", (DL_FUNC) &_AdaptiveAllocation_sum_allocation, 2},
@@ -302,6 +313,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},
     {"_AdaptiveAllocation_entropy_allocation", (DL_FUNC) &_AdaptiveAllocation_entropy_allocation, 7},
     {"_AdaptiveAllocation_EntropyGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_EntropyGibbsSamp, 9},
+    {"_AdaptiveAllocation_summary_Posterior", (DL_FUNC) &_AdaptiveAllocation_summary_Posterior, 1},
     {NULL, NULL, 0}
 };
 

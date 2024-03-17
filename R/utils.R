@@ -52,3 +52,19 @@ scattPlot2d <- function(res = NULL, data, entropy = FALSE) {
   return(plotEnt)
 }
 
+
+#' Posterior Summary - Bayesian nonparametric mixture inconsistency for the number of components: 
+#' How worried should we be in practice? - by Paul Kirk page 7.
+#' 
+#' @export
+
+psm <- function(z) {
+  sumPost <- summary_Posterior(as.matrix(z))
+  hm <- heatmap(sumPost, 
+          col = colorRampPalette(c("#001F3F", "#009E73"))(100),  # Define color gradient
+          # main = "Posterior Similarity Matrix",
+          scale = "none",  # Turn off scaling for values
+          symm = TRUE)     # Ensure the matrix is symmetric
+  return(hm)
+}
+

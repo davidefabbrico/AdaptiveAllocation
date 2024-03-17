@@ -24,7 +24,7 @@ using namespace std;
 // [X] Check the generating mechanism
 // [X] Plot with entropy
 // Emphasise the color
-// [ ] How to summarize the posterior?
+// [X] How to summarize the posterior? (in C++)
 // [ ] Code Optimization
 
 // Modello:
@@ -942,5 +942,22 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
                       Named("Precision") = PREC,
                       Named("Execution_Time") = duration/1000000);
   
+}
+
+
+// [[Rcpp::export]]
+arma::mat summary_Posterior(arma::imat z) {
+  int N = z.n_cols;
+  int M = z.n_rows;
+  arma::mat sumPost = arma::zeros<arma::mat>(N, N);
+  for (int i = 0; i<N; i++) {
+    for (int j = 0; j<N; j++) {
+      for (int m = 0; m<M; m++) {
+        sumPost(i, j) = sumPost(i, j) + diracF(z(m, i), z(m, j));
+      }
+    }
+  }
+  sumPost = sumPost/M;
+  return(sumPost);
 }
 

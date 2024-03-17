@@ -24,4 +24,5 @@
 #' @import mltools
 #' @import MASS
 #' @import ggplot2
+#' @import RColorBrewer
 NULL
