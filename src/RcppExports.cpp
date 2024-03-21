@@ -162,6 +162,38 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// update_precDH
+arma::mat update_precDH(double a0, double b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X);
+RcppExport SEXP _AdaptiveAllocation_update_precDH(SEXP a0SEXP, SEXP b0SEXP, SEXP muSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type a0(a0SEXP);
+    Rcpp::traits::input_parameter< double >::type b0(b0SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_precDH(a0, b0, mu, z, N, X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// update_muDH
+arma::mat update_muDH(arma::rowvec mu0, arma::mat p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X);
+RcppExport SEXP _AdaptiveAllocation_update_muDH(SEXP mu0SEXP, SEXP p0SEXP, SEXP precSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::rowvec >::type mu0(mu0SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type p0(p0SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_muDH(mu0, p0, prec, z, N, X));
+    return rcpp_result_gen;
+END_RCPP
+}
 // update_muD
 arma::mat update_muD(arma::rowvec mu0, double p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X);
 RcppExport SEXP _AdaptiveAllocation_update_muD(SEXP mu0SEXP, SEXP p0SEXP, SEXP precSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
@@ -175,22 +207,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
     rcpp_result_gen = Rcpp::wrap(update_muD(mu0, p0, prec, z, N, X));
-    return rcpp_result_gen;
-END_RCPP
-}
-// update_precD
-arma::mat update_precD(double a0, arma::rowvec b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X);
-RcppExport SEXP _AdaptiveAllocation_update_precD(SEXP a0SEXP, SEXP b0SEXP, SEXP muSEXP, SEXP zSEXP, SEXP NSEXP, SEXP XSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type a0(a0SEXP);
-    Rcpp::traits::input_parameter< arma::rowvec >::type b0(b0SEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
-    Rcpp::traits::input_parameter< arma::irowvec >::type N(NSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_precD(a0, b0, mu, z, N, X));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -306,8 +322,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_update_prec", (DL_FUNC) &_AdaptiveAllocation_update_prec, 6},
     {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 6},
     {"_AdaptiveAllocation_update_allocationD", (DL_FUNC) &_AdaptiveAllocation_update_allocationD, 4},
+    {"_AdaptiveAllocation_update_precDH", (DL_FUNC) &_AdaptiveAllocation_update_precDH, 6},
+    {"_AdaptiveAllocation_update_muDH", (DL_FUNC) &_AdaptiveAllocation_update_muDH, 6},
     {"_AdaptiveAllocation_update_muD", (DL_FUNC) &_AdaptiveAllocation_update_muD, 6},
-    {"_AdaptiveAllocation_update_precD", (DL_FUNC) &_AdaptiveAllocation_update_precD, 6},
     {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 7},
     {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 7},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},

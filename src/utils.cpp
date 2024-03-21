@@ -16,7 +16,7 @@ using namespace std;
 // From Bayesian Regularization for Normal Mixture Estimation and Model-Based Clustering 
 // by Fraley and Raftery page 159-160. We have 4 more hyperparameters:
 // 1. mu ~ N(muP, sigma^2/kP)
-// 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2)
+// 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2) !!!!Occhio is conditional!!!.
 // for the mean the mean of the data. kP = 0.01
 // vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
 // [X] Random Gibbs sampler
@@ -26,6 +26,9 @@ using namespace std;
 // Emphasise the color
 // [X] How to summarize the posterior? (in C++)
 // [ ] Code Optimization
+// [ ] Check the full conditional with the new Regularization
+// [ ] Evaluate Convergence
+// [ ] How many time I need to update the Prob Allocation Matrix?
 
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
@@ -335,6 +338,83 @@ arma::irowvec update_allocationD(arma::rowvec pi, arma::mat mu, arma::mat prec, 
 }
 
 
+// FCD sigma
+// [[Rcpp::export]]
+arma::mat update_precDH(double a0, double b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X) {
+  // a0 iperparametro a priori della inverse gamma
+  // b0 iperparametro a priori della inverse gamma
+  // mu vettore delle medie a posteriori
+  // z matrice di allocazione
+  // N somme matrice allocazione
+  // x dati
+  int n = X.n_rows;
+  int K = N.n_elem;
+  int d = X.n_cols;
+  arma::mat prec(K, d);
+  arma::mat sumNum(K, d);
+  // cout << "Medie: " << mu << "\n";
+  for (int k = 0; k<K; k++) {
+    for (int j = 0; j<d; j++) {
+      for (int i = 0; i<n; i++) {
+        sumNum(k,j) = sumNum(k,j) + diracF(z(i), k)*pow(X(i,j)-mu(k,j), 2);
+      }
+    }
+  }
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      double shape = a0+(N(k)/2);
+      // compute the sum
+      double scale = b0+sumNum(k,j)/2;
+      prec(k,j) = callrgamma(1, shape, 1/scale)(0);
+    }
+  } 
+  return prec;
+} 
+
+// FCD mu
+// [[Rcpp::export]]
+arma::mat update_muDH(arma::rowvec mu0, arma::mat p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X) {
+  // La struttura è la seguente: un vettore media per ogni cluster e una matrice precisione
+  // per ogni cluster. Dato che assumiamo indipendenza possiamo mettere la diagonale
+  // all'interno di una matrice Kxd
+  // p0 la precisione a priori 
+  // mu il vettore delle medie a posteriori (un vettore per ogni cluster)
+  // prec la precisione a posteriori 
+  // z la matrice di allocazione
+  // N la somma delle allocazioni
+  int K = N.n_elem;
+  int n = X.n_rows;
+  int d = X.n_cols;
+  arma::mat MuPosteriori(K, d);
+  arma::mat muPost(K, d);
+  arma::mat precPost(K, d);
+  arma::mat sampMean(K, d);
+  // Prior Setting (tutti i cluster partono con la stessa hyperpriori per la media)
+  arma::mat muPrior(K, d);
+  for (int k = 0; k<K; k++) {
+    muPrior.row(k) = mu0;
+  }
+  
+  for (int k = 0; k<K; k++) {
+    for (int j = 0; j<d; j++) {
+      for (int i = 0; i<n; i++) {
+        sampMean(k,j) = sampMean(k,j) + diracF(z(i), k)*X(i, j);
+      }
+    } 
+  } 
+  
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      muPost(k,j) = (prec(k,j)*sampMean(k,j)+muPrior(k,j)*p0(k,j))/(prec(k,j)*N(k)+p0(k,j));
+      precPost(k,j) = prec(k,j)*N(k)+p0(k,j);
+      MuPosteriori(k,j) = R::rnorm(muPost(k,j), sqrt(1/precPost(k,j)));
+    } 
+  } 
+  
+  return MuPosteriori;
+}  
+
+
 // FCD mu
 // [[Rcpp::export]]
 arma::mat update_muD(arma::rowvec mu0, double p0, arma::mat prec, arma::irowvec z, arma::irowvec N, arma::mat X) {
@@ -380,38 +460,6 @@ arma::mat update_muD(arma::rowvec mu0, double p0, arma::mat prec, arma::irowvec 
 }
 
 
-// FCD sigma
-// [[Rcpp::export]]
-arma::mat update_precD(double a0, arma::rowvec b0, arma::mat mu, arma::irowvec z, arma::irowvec N, arma::mat X) {
-  // a0 iperparametro a priori della inverse gamma
-  // b0 iperparametro a priori della inverse gamma
-  // mu vettore delle medie a posteriori
-  // z matrice di allocazione
-  // N somme matrice allocazione
-  // x dati
-  int n = X.n_rows;
-  int K = N.n_elem;
-  int d = X.n_cols;
-  arma::mat prec(K,d);
-  arma::mat sumNum(K,d);
-  // cout << "Medie: " << mu << "\n";
-  for (int k = 0; k<K; k++) {
-    for (int j = 0; j<d; j++) {
-      for (int i = 0; i<n; i++) {
-        sumNum(k,j) = sumNum(k,j) + diracF(z(i), k)*pow(X(i,j)-mu(k,j), 2);
-      }
-    }
-  }
-  for (int j = 0; j<d; j++) {
-    for (int k = 0; k<K; k++) {
-      double shape = a0+(N(k)/2);
-      // compute the sum
-      double scale = b0(j)+sumNum(k,j)/2;
-      prec(k,j) = callrgamma(1, shape, 1/scale)(0);
-    }
-  }
-  return prec;
-}
 
 
 // Gibbs sampler d-dimension
@@ -442,25 +490,22 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
   arma::rowvec hyper_mu_mean(d);
-  arma::rowvec hyper_prec_b(d);
-  double hyper_mu_var;
+  double hyper_prec_b;
   double hyper_prec_a;
+  arma::mat hyper_mu_prec(K, d);
   if (method == "EB") {
     hyper_mu_mean = mean(X, 0);
-    hyper_mu_var = (1/hyper(3))/0.01; // 1/sigma/kp
-    if (hyper_mu_var >= 14) {
-      cout << "Stability Problem... Set a higher precision!" << "\n";
-    }
     hyper_prec_a = d + 2;
-    hyper_prec_b = (var(X, 0)/d)/(pow(K, 2/d));
+    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2/d));
   } else {
+    cout << "Remember to specify the hyperparameter values!" << "\n";
     for (int j = 0; j<d; j++) {
       hyper_mu_mean(j) = hyper(2);
     }
-    for (int j = 0; j<d; j++) {
-      hyper_prec_b(j) = hyper(5);
+    hyper_prec_b = hyper(5);
+    for (int k = 0; k<K; k++) {
+      hyper_mu_prec.row(k) = hyper(3)*arma::ones<arma::rowvec>(d);
     }
-    hyper_mu_var = hyper(3);
     hyper_prec_a = hyper(4);
   }
   
@@ -480,19 +525,29 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   arma::rowvec pi(K);
   arma::vec concPar = hyper(1) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
-  // MU
-  arma::mat mu(K, d);
-  for (int j = 0; j<d; j++) {
-    for (int k = 0; k<K; k++) {
-      mu(k,j) = R::rnorm(hyper_mu_mean(j), hyper_mu_var);
-    }
-  }
   // PRECISION
   arma::mat prec(K, d);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b(j))(0);
+      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b)(0);
     }
+  }
+  // MU
+  arma::mat mu(K, d);
+  if (method == "EB") {
+    double kP = 0.01;
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        hyper_mu_prec(k,j) = prec(k,j);
+        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1/sqrt(kP*hyper_mu_prec(k,j)));
+      }
+    } 
+  } else {
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1/sqrt(hyper_mu_prec(k,j)));
+      }
+    } 
   }
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
@@ -506,9 +561,9 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
     pi = update_pi(concPar.t(), N);
     // update params
     // mu
-    mu = update_muD(hyper_mu_mean, hyper_mu_var, prec, z, N, X);
+    mu = update_muDH(hyper_mu_mean, hyper_mu_prec, prec, z, N, X);
     // precision
-    prec = update_precD(hyper_prec_a, hyper_prec_b, mu, z, N, X);
+    prec = update_precDH(hyper_prec_a, hyper_prec_b, mu, z, N, X);
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
@@ -619,28 +674,29 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
+  ////////////////////////////////////////////////////
+  ////////// Emprical bayes prior settings ///////////
+  ///////////////////////////////////////////////////
   arma::rowvec hyper_mu_mean(d);
-  arma::rowvec hyper_prec_b(d);
-  double hyper_mu_var;
+  double hyper_prec_b;
   double hyper_prec_a;
+  arma::mat hyper_mu_prec(K, d);
   if (method == "EB") {
     hyper_mu_mean = mean(X, 0);
-    hyper_mu_var = (1/hyper(3))/0.01; // 1/sigma/kp
-    if (hyper_mu_var >= 14) {
-      cout << "Stability Problem... Set a higher precision!" << "\n";
-    }
     hyper_prec_a = d + 2;
-    hyper_prec_b = (var(X, 0)/d)/(pow(K, 2/d));
-  } else { 
+    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2/d));
+  } else {
+    cout << "Remember to specify the hyperparameter values!" << "\n";
     for (int j = 0; j<d; j++) {
       hyper_mu_mean(j) = hyper(2);
-    } 
-    for (int j = 0; j<d; j++) {
-      hyper_prec_b(j) = hyper(5);
-    } 
-    hyper_mu_var = hyper(3);
+    }  
+    hyper_prec_b = hyper(5);
+    for (int k = 0; k<K; k++) {
+      hyper_mu_prec.row(k) = hyper(3)*arma::ones<arma::rowvec>(d);
+    }  
     hyper_prec_a = hyper(4);
-  }
+  }  
+  
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -649,28 +705,38 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   NumericVector probC(K);
   for (int k = 0; k<K; k++) {
     probC(k) = hyper(0)/K;
-  }
+  }  
   for (int i = 0; i<n; i++) {
     z(i) = csample_num(indC, 1, true, probC)(0);
-  }
+  }  
   // PI
   arma::rowvec pi(K);
   arma::vec concPar = hyper(1) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
-  // MU
-  arma::mat mu(K, d);
-  for (int j = 0; j<d; j++) {
-    for (int k = 0; k<K; k++) {
-      mu(k,j) = R::rnorm(hyper_mu_mean(j), hyper_mu_var);
-    }
-  }
   // PRECISION
   arma::mat prec(K, d);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b(j))(0);
+      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b)(0);
     }
-  }
+  }  
+  // MU
+  arma::mat mu(K, d);
+  if (method == "EB") {
+    double kP = 0.01;
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        hyper_mu_prec(k,j) = prec(k,j);
+        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1/sqrt(kP*hyper_mu_prec(k,j)));
+      }  
+    } 
+  } else {
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1/sqrt(hyper_mu_prec(k,j)));
+      }
+    }  
+  } 
   // Store allocation
   List allocation(2);
   // Probability Matrix
@@ -692,9 +758,9 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
     pi = update_pi(concPar.t(), N);
     // update params
     // mu
-    mu = update_muD(hyper_mu_mean, hyper_mu_var, prec, z, N, X);
+    mu = update_muDH(hyper_mu_mean, hyper_mu_prec, prec, z, N, X);
     // precision
-    prec = update_precD(hyper_prec_a, hyper_prec_b, mu, z, N, X);
+    prec = update_precDH(hyper_prec_a, hyper_prec_b, mu, z, N, X);
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
@@ -724,8 +790,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
 
 ////////////////////////////////////////////////////
 ////////// Entropy-Guided Gibbs Sampler ///////////
-///////////////////////////////////////////////////
-
+//////////////////////////////////////////////////
 NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X) {
   int K = pi.n_elem; // numero di cluster
   int n = X.n_rows; // numero di osservazioni
@@ -808,14 +873,15 @@ arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAlloca
 List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma) {
   // precision and not variance!!
   // m: how many observation I want to update
+  // start time
   auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
   ///////////////////////////////////////////////////
-  int nout = (iteration-burnin)/thin;
+  int nout = (iteration-burnin)/thin; // number of sample a posteriori
   int n = X.n_rows; // number of rows
   int d = X.n_cols; // number of columns
-  NumericVector indC(K);
+  NumericVector indC(K); // indici per i cluster
   for (int k = 0; k<K; k++) {
     indC(k) = k;
   }
@@ -836,33 +902,31 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   // Alpha weight
   NumericVector alpha(n); // start from 1/n
   for (int i = 0; i<n; i++) {
-    alpha(i) = 1.0/n;
+    alpha(i) = 1.0/n; // sample
   } 
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
   arma::rowvec hyper_mu_mean(d);
-  arma::rowvec hyper_prec_b(d);
-  double hyper_mu_var;
+  double hyper_prec_b;
   double hyper_prec_a;
+  arma::mat hyper_mu_prec(K, d);
   if (method == "EB") {
     hyper_mu_mean = mean(X, 0);
-    hyper_mu_var = (1/hyper(3))/0.01; // 1/sigma/kp
-    if (hyper_mu_var >= 14) {
-      cout << "Stability Problem... Set a higher precision!" << "\n";
-    } 
     hyper_prec_a = d + 2;
-    hyper_prec_b = (var(X, 0)/d)/(pow(K, 2/d));
-  } else {  
+    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2/d));
+  } else {
+    cout << "Remember to specify the hyperparameter values!" << "\n";
     for (int j = 0; j<d; j++) {
       hyper_mu_mean(j) = hyper(2);
-    }  
-    for (int j = 0; j<d; j++) {
-      hyper_prec_b(j) = hyper(5);
-    }  
-    hyper_mu_var = hyper(3);
+    } 
+    hyper_prec_b = hyper(5);
+    for (int k = 0; k<K; k++) {
+      hyper_mu_prec.row(k) = hyper(3)*arma::ones<arma::rowvec>(d);
+    } 
     hyper_prec_a = hyper(4);
   } 
+  
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -879,20 +943,32 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   arma::rowvec pi(K);
   arma::vec concPar = hyper(1) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
-  // MU
-  arma::mat mu(K, d);
-  for (int j = 0; j<d; j++) {
-    for (int k = 0; k<K; k++) {
-      mu(k,j) = R::rnorm(hyper_mu_mean(j), hyper_mu_var);
-    }
-  } 
   // PRECISION
   arma::mat prec(K, d);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b(j))(0);
+      prec(k,j) = callrgamma(1, hyper_prec_a, 1/hyper_prec_b)(0);
+    }
+  } 
+  // MU
+  arma::mat mu(K, d);
+  if (method == "EB") {
+    double kP = 0.01;
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        hyper_mu_prec(k,j) = prec(k,j);
+        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1/sqrt(kP*hyper_mu_prec(k,j)));
+      } 
     } 
-  }
+  } else {
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1/sqrt(hyper_mu_prec(k,j)));
+      }
+    } 
+  } 
+  // cout << "Mean \n " << hyper_mu_mean << "\n";
+  // cout  << "Variance \n " << sqrt(hyper_prec) << "\n";
   // Store allocation
   List allocation(2);
   // Probability Matrix
@@ -914,9 +990,9 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
     pi = update_pi(concPar.t(), N);
     // update params
     // mu
-    mu = update_muD(hyper_mu_mean, hyper_mu_var, prec, z, N, X);
+    mu = update_muDH(hyper_mu_mean, hyper_mu_prec, prec, z, N, X);
     // precision
-    prec = update_precD(hyper_prec_a, hyper_prec_b, mu, z, N, X);
+    prec = update_precDH(hyper_prec_a, hyper_prec_b, mu, z, N, X);
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////

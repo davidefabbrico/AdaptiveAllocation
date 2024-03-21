@@ -15,7 +15,7 @@ ssg <- function(x, hyper = c(1, 1, 0, 20, 1, 1), K = 3, iteration = 1000, burnin
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-ssgd <- function(X, hyper = c(1, 1, 0, 20, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5, method = "EB") {
+ssgd <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5, method = "EB") {
   # Hyperparameters description:
   # 1 concPar Dirichlet
   # 2 categorical
@@ -34,7 +34,7 @@ ssgd <- function(X, hyper = c(1, 1, 0, 20, 1, 1), K = 3, iteration = 1000, burni
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-rssg <- function(X, hyper = c(1, 1, 0, 20, 1, 1), K = 3, m, iteration = 1000, burnin = 50, thin = 5, method = "EB") {
+rssg <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, m, iteration = 1000, burnin = 50, thin = 5, method = "EB") {
   res <- RSSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method))
   return(res)
