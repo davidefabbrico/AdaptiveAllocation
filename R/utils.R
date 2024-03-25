@@ -35,17 +35,17 @@ contPlot2d <- function(data) {
 #' Scatter Plot + entropy
 #'
 #' @export
-scattPlot2d <- function(res = NULL, data, entropy = FALSE) {
-  if (entropy == TRUE) {
-    ent <- apply(res$Entropy, 2, mean)
-    dfEntropy <- data.frame(x = data[,1], y = data[,2], entropy = ent)
-    plotEnt <- ggplot(data = dfEntropy, aes(x = x, y = y, color = entropy)) +
+scattPlot2d <- function(res = NULL, data, diversity = FALSE) {
+  if (diversity == TRUE) {
+    div <- apply(res$Diversity, 2, mean)
+    dfDiversity <- data.frame(x = data[,1], y = data[,2], diversity = div)
+    plotEnt <- ggplot(data = dfDiversity, aes(x = x, y = y, color = diversity)) +
       geom_point(size = 2) +
       scale_color_gradient(low = "#001F3F", high = "#009E73") +
       labs(title = "Two-dimensional Gaussian Finite Mixture", x = "V1", y = "V2")
   } else {
-    dfNEntropy <- data.frame(x = data[,1], y = data[,2])
-    plotEnt <- ggplot(data = dfNEntropy, aes(x = x, y = y)) +
+    dfNDiversity <- data.frame(x = data[,1], y = data[,2])
+    plotEnt <- ggplot(data = dfNDiversity, aes(x = x, y = y)) +
       geom_point(color = "#001F3F", size = 2) +
       labs(title = "Two-dimensional Gaussian Finite Mixture", x = "V1", y = "V2")
   }

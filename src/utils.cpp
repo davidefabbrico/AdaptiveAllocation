@@ -12,7 +12,7 @@ using namespace std;
 
 // TODO
 // [X] data in d-dimension
-// [X] How to set the Hyperparameters?
+// [~] How to set the Hyperparameters?
 // From Bayesian Regularization for Normal Mixture Estimation and Model-Based Clustering 
 // by Fraley and Raftery page 159-160. We have 4 more hyperparameters:
 // 1. mu ~ N(muP, sigma^2/kP)
@@ -814,6 +814,21 @@ NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma
   return(probAllocation);
 }
 
+// [[Rcpp::export]]
+NumericVector GSIndex(NumericMatrix probAllocation) {
+  int K = probAllocation.ncol(); // numero di cluster
+  int n = probAllocation.nrow(); // numero di osservazioni
+  NumericVector GSimpson(n);
+  for (int i = 0; i<n; i++) {
+    for (int k = 0; k<K; k++) {
+      GSimpson(i) = GSimpson(i) + pow(probAllocation(i, k), 2);
+    }
+    GSimpson(i) = 1 - GSimpson(i);
+  }
+  return(GSimpson);
+}
+
+// [[Rcpp::export]]
 NumericVector entropy(NumericMatrix probAllocation) {
   int K = probAllocation.ncol(); // numero di cluster
   int n = probAllocation.nrow(); // numero di osservazioni
@@ -826,14 +841,15 @@ NumericVector entropy(NumericMatrix probAllocation) {
     Entropy(i) = -Entropy(i);
   }
   // STEP 3. Normalize the entropy
+  double sommaEntropia = sum(Entropy);
   for (int i = 0; i<n; i++) {
-    Entropy(i) = Entropy(i) / sum(Entropy);
+    Entropy(i) = Entropy(i) / sommaEntropia;
   } 
   return(Entropy);
 }
 
 // [[Rcpp::export]]
-arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma) {
+arma::irowvec diversity_allocation(NumericVector Diversity, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma) {
   // pi sono le proporzioni di ogni cluster
   // mu è la media a posteriori
   // sigma è la varianza a posteriori
@@ -848,7 +864,7 @@ arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAlloca
   if (iter == 0) {
     alpha = constVal; // da capire...
   } else {
-    alpha = alpha*((iter-1.0)/iter)+(1.0/iter)*(gamma*Entropy+(1-gamma)*constVal);
+    alpha = alpha*((iter-1.0)/iter)+(1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
   }
   // Update the allocation
   NumericVector indI(n);
@@ -870,7 +886,7 @@ arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAlloca
 
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
-List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, String diversity) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -891,7 +907,7 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   // PI
   arma::mat PI(nout, K);
   // Entropy
-  NumericMatrix E(nout, n);
+  NumericMatrix D(nout, n);
   // MU
   List MU(nout);
   // SIGMA
@@ -973,17 +989,23 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   List allocation(2);
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
-  NumericVector Entropy(n);
+  NumericVector Diversity(n);
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
     // update probability 
     probAllocation = comp_ProbAlloc(pi, mu, prec, X);
-    // compute entropy
-    Entropy = entropy(probAllocation);
+    if (diversity == "Entropy") {
+      // compute entropy
+      Diversity = entropy(probAllocation); 
+    } else if (diversity == "Gini-Simpson") {
+      Diversity = GSIndex(probAllocation);
+    } else {
+      cout << "You need to specify a Diversity Index!" << "\n";
+    }
     // update z
-    z = entropy_allocation(Entropy, probAllocation, m, z, alpha, t, gamma);
+    z = diversity_allocation(Diversity, probAllocation, m, z, alpha, t, gamma);
     // compute N
     arma::irowvec N = sum_allocation(z, K);
     // update pi
@@ -999,7 +1021,7 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
       PI.row(idx) = pi;
-      E.row(idx) = Entropy;
+      D.row(idx) = Diversity;
       MU[idx] = mu;
       PREC[idx] = prec;
       idx = idx + 1;
@@ -1012,7 +1034,7 @@ List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   return List::create(Named("Allocation") = Z,
-                      Named("Entropy") = E,
+                      Named("Diversity") = D,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
                       Named("Precision") = PREC,

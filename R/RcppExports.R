@@ -69,12 +69,20 @@ RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method) {
     .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method)
 }
 
-entropy_allocation <- function(Entropy, probAllocation, m, z, alpha, iter, gamma) {
-    .Call(`_AdaptiveAllocation_entropy_allocation`, Entropy, probAllocation, m, z, alpha, iter, gamma)
+GSIndex <- function(probAllocation) {
+    .Call(`_AdaptiveAllocation_GSIndex`, probAllocation)
 }
 
-EntropyGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma) {
-    .Call(`_AdaptiveAllocation_EntropyGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma)
+entropy <- function(probAllocation) {
+    .Call(`_AdaptiveAllocation_entropy`, probAllocation)
+}
+
+diversity_allocation <- function(Diversity, probAllocation, m, z, alpha, iter, gamma) {
+    .Call(`_AdaptiveAllocation_diversity_allocation`, Diversity, probAllocation, m, z, alpha, iter, gamma)
+}
+
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity)
 }
 
 summary_Posterior <- function(z) {

@@ -262,26 +262,48 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// entropy_allocation
-arma::irowvec entropy_allocation(NumericVector Entropy, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma);
-RcppExport SEXP _AdaptiveAllocation_entropy_allocation(SEXP EntropySEXP, SEXP probAllocationSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP, SEXP iterSEXP, SEXP gammaSEXP) {
+// GSIndex
+NumericVector GSIndex(NumericMatrix probAllocation);
+RcppExport SEXP _AdaptiveAllocation_GSIndex(SEXP probAllocationSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericVector >::type Entropy(EntropySEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
+    rcpp_result_gen = Rcpp::wrap(GSIndex(probAllocation));
+    return rcpp_result_gen;
+END_RCPP
+}
+// entropy
+NumericVector entropy(NumericMatrix probAllocation);
+RcppExport SEXP _AdaptiveAllocation_entropy(SEXP probAllocationSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
+    rcpp_result_gen = Rcpp::wrap(entropy(probAllocation));
+    return rcpp_result_gen;
+END_RCPP
+}
+// diversity_allocation
+arma::irowvec diversity_allocation(NumericVector Diversity, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma);
+RcppExport SEXP _AdaptiveAllocation_diversity_allocation(SEXP DiversitySEXP, SEXP probAllocationSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP, SEXP iterSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type Diversity(DiversitySEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
     Rcpp::traits::input_parameter< int >::type m(mSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< int >::type iter(iterSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
-    rcpp_result_gen = Rcpp::wrap(entropy_allocation(Entropy, probAllocation, m, z, alpha, iter, gamma));
+    rcpp_result_gen = Rcpp::wrap(diversity_allocation(Diversity, probAllocation, m, z, alpha, iter, gamma));
     return rcpp_result_gen;
 END_RCPP
 }
-// EntropyGibbsSamp
-List EntropyGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma);
-RcppExport SEXP _AdaptiveAllocation_EntropyGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP gammaSEXP) {
+// DiversityGibbsSamp
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, String diversity);
+RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP diversitySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -294,7 +316,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
     Rcpp::traits::input_parameter< String >::type method(methodSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
-    rcpp_result_gen = Rcpp::wrap(EntropyGibbsSamp(X, hyper, K, m, iteration, burnin, thin, method, gamma));
+    Rcpp::traits::input_parameter< String >::type diversity(diversitySEXP);
+    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -328,8 +351,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 7},
     {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 7},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},
-    {"_AdaptiveAllocation_entropy_allocation", (DL_FUNC) &_AdaptiveAllocation_entropy_allocation, 7},
-    {"_AdaptiveAllocation_EntropyGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_EntropyGibbsSamp, 9},
+    {"_AdaptiveAllocation_GSIndex", (DL_FUNC) &_AdaptiveAllocation_GSIndex, 1},
+    {"_AdaptiveAllocation_entropy", (DL_FUNC) &_AdaptiveAllocation_entropy, 1},
+    {"_AdaptiveAllocation_diversity_allocation", (DL_FUNC) &_AdaptiveAllocation_diversity_allocation, 7},
+    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 10},
     {"_AdaptiveAllocation_summary_Posterior", (DL_FUNC) &_AdaptiveAllocation_summary_Posterior, 1},
     {NULL, NULL, 0}
 };

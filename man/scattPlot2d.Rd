@@ -4,7 +4,7 @@
 \alias{scattPlot2d}
 \title{Scatter Plot + entropy}
 \usage{
-scattPlot2d(res = NULL, data, entropy = FALSE)
+scattPlot2d(res = NULL, data, diversity = FALSE)
 }
 \description{
 Scatter Plot + entropy
