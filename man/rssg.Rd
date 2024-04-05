@@ -8,7 +8,7 @@ rssg(
   X,
   hyper = c(1, 1, 0, 0.1, 1, 1),
   K = 3,
-  m,
+  m = 10,
   iteration = 1000,
   burnin = 50,
   thin = 5,
