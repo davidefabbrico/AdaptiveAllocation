@@ -11,7 +11,8 @@ ssgd(
   iteration = 1000,
   burnin = 50,
   thin = 5,
-  method = "EB"
+  method = "EB",
+  trueAllocation = numeric(0)
 )
 }
 \description{

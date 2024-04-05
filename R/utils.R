@@ -13,6 +13,8 @@ genGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
     cluster <- mvrnorm(round(n/K), matMean[k,], listPrec[[k]])
     data <- rbind(data, cluster)
   }
+  cluster_id <- rep(0:(K-1), each = round(n/K))
+  data <- cbind(data, cluster_id)
   return(list(data, matMean, precMat))
 }
 

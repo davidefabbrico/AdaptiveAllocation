@@ -41,6 +41,14 @@ SSG <- function(x, hyper, K, iteration, burnin, thin) {
     .Call(`_AdaptiveAllocation_SSG`, x, hyper, K, iteration, burnin, thin)
 }
 
+BinderLoss <- function(eAlloc, tAlloc) {
+    .Call(`_AdaptiveAllocation_BinderLoss`, eAlloc, tAlloc)
+}
+
+contMat <- function(eAlloc, tAlloc) {
+    .Call(`_AdaptiveAllocation_contMat`, eAlloc, tAlloc)
+}
+
 update_allocationD <- function(pi, mu, prec, X) {
     .Call(`_AdaptiveAllocation_update_allocationD`, pi, mu, prec, X)
 }
@@ -57,16 +65,16 @@ update_muD <- function(mu0, p0, prec, z, N, X) {
     .Call(`_AdaptiveAllocation_update_muD`, mu0, p0, prec, z, N, X)
 }
 
-DSSG <- function(X, hyper, K, iteration, burnin, thin, method) {
-    .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin, method)
+DSSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAllocation) {
+    .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin, method, trueAllocation)
 }
 
 update_allocationRD <- function(pi, mu, prec, X, m, z, alpha) {
     .Call(`_AdaptiveAllocation_update_allocationRD`, pi, mu, prec, X, m, z, alpha)
 }
 
-RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method) {
-    .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method)
+RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method, trueAllocation) {
+    .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method, trueAllocation)
 }
 
 GSIndex <- function(probAllocation) {
@@ -81,8 +89,8 @@ diversity_allocation <- function(Diversity, probAllocation, m, z, alpha, iter, g
     .Call(`_AdaptiveAllocation_diversity_allocation`, Diversity, probAllocation, m, z, alpha, iter, gamma)
 }
 
-DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity) {
-    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity)
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity, trueAllocation) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity, trueAllocation)
 }
 
 summary_Posterior <- function(z) {

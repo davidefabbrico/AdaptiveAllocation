@@ -116,8 +116,9 @@ arma::irowvec update_allocation(arma::rowvec pi, arma::vec mu, arma::vec prec, a
     }
   }
   // normalizzo le righe
+  arma::vec rSum = rowSums(probCluster);
   for (int i = 0; i<n; i++) {
-    probCluster(i, _) = probCluster(i, _) / sum(probCluster(i, _));
+    probCluster(i, _) = probCluster(i, _) / rSum(i);
   }
   // cout << "Probability Matrix Allocation: " << probCluster;
   NumericVector indC(K);
@@ -289,6 +290,86 @@ List SSG(arma::vec x, arma::vec hyper, int K, int iteration, int burnin, int thi
 
 
 ////////////////////////////////////////////////////
+////////////////// Loss Function ///////////////////
+///////////////////////////////////////////////////
+
+// [[Rcpp::export]]
+double BinderLoss(arma::irowvec eAlloc, arma::irowvec tAlloc) {
+  int n = eAlloc.n_elem;
+  double BL;
+  for (int i = 0; i<n; i++) {
+    for (int j = (i+1); j<n; j++) {
+      BL = BL + diracF(tAlloc(i), tAlloc(j))*(1-diracF(eAlloc(i), eAlloc(j)))+ (1-diracF(tAlloc(i), tAlloc(j)))*diracF(eAlloc(i), eAlloc(j));
+    }
+  }
+  return(BL);
+} 
+
+// Contingency Table
+// [[Rcpp::export]]
+arma::mat contMat(arma::irowvec eAlloc, arma::irowvec tAlloc) {
+  int n = tAlloc.n_elem; 
+  arma::irowvec nx = arma::unique(tAlloc);
+  int nE = nx.n_elem;
+  arma::mat cT(nE, nE);
+  // cout << "TRUE " << tAlloc;
+  // cout << "EST " << eAlloc;
+  for (int i = 0; i<n; i++) {
+    cT(tAlloc(i), eAlloc(i)) += 1;
+  } 
+  return(cT);
+} 
+
+int coefBinom(int n, int k) {
+  if (k > n)
+    return 0;
+  if (k == 0 || k == n)
+    return 1;
+  return coefBinom(n - 1, k - 1) + coefBinom(n - 1, k);
+}
+
+double ari(arma::irowvec eAlloc, arma::irowvec tAlloc) {
+  int n = tAlloc.n_elem; 
+  arma::irowvec nx = arma::unique(tAlloc);
+  int nE = nx.n_elem;
+  arma::mat cT(nE, nE);
+  for (int i = 0; i<n; i++) {
+    cT(tAlloc(i), eAlloc(i)) += 1;
+  }
+  arma::vec a = sum(cT, 1); // Riga
+  arma::rowvec b = sum(cT, 0); // Colonna
+  // NUMERATOR
+  double numPart1 = 0;
+  for (int i = 0; i<nE; i++) {
+    for (int j = 0; j<nE; j++) {
+      numPart1 += coefBinom(cT(i, j), 2);
+    }
+  }
+  double numP2 = 0;
+  for (int i = 0; i<nE; i++) {
+    numP2 += coefBinom(a(i), 2);
+  }
+  // cout << "numP2 " << numP2 << "\n";
+  double numP3 = 0;
+  for (int i = 0; i<nE; i++) {
+    numP3 += coefBinom(b(i), 2);
+    // cout << coefBinom(b(i), 2) << "\n";
+  }
+  // cout << "numP3 " << numP3 << "\n";
+  double denden = coefBinom(n, 2);
+  double numPart2 = (numP2*numP3)/denden;
+  double num = numPart1 - numPart2;
+  // Denominator
+  double denPart1 = (numP2 + numP3)/2;
+  double denPart2 = (numP2*numP3)/denden;
+  double den = denPart1 - denPart2;
+  // cout << "Numeratore " << num << "\n";
+  // cout << "Denominatore " << den << "\n";
+  return(num/den);
+}
+
+
+////////////////////////////////////////////////////
 //////////////// D-Dimensional Data ////////////////
 ///////////////////////////////////////////////////
 double myProduct(arma::vec a) {
@@ -323,8 +404,9 @@ arma::irowvec update_allocationD(arma::rowvec pi, arma::mat mu, arma::mat prec, 
     }
   }
   // normalizzo le righe
+  arma::vec rSum = rowSums(probCluster); 
   for (int i = 0; i<n; i++) {
-    probCluster(i, _) = probCluster(i, _) / sum(probCluster(i, _));
+    probCluster(i, _) = probCluster(i, _) / rSum(i);
   }
   // cout << "Probability Matrix Allocation: " << probCluster;
   NumericVector indC(K);
@@ -460,11 +542,9 @@ arma::mat update_muD(arma::rowvec mu0, double p0, arma::mat prec, arma::irowvec 
 }
 
 
-
-
 // Gibbs sampler d-dimension
 // [[Rcpp::export]]
-List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method) {
+List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method, arma::irowvec trueAllocation) {
   // precision and not variance!!
   auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
@@ -486,6 +566,8 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   List MU(nout);
   // SIGMA
   List PREC(nout);
+  // LOSS
+  arma::vec LOSS(nout);
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -549,6 +631,7 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
       }
     } 
   }
+  double Loss = 0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -572,6 +655,11 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
       PI.row(idx) = pi;
       MU[idx] = mu;
       PREC[idx] = prec;
+      if (sum(trueAllocation) != 0) {
+        Loss = ari(z, trueAllocation);
+        LOSS(idx) = Loss;
+        // cout << "Matrice di Contingenza: \n" << contMat(z, trueAllocation) << "\n";
+      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -581,11 +669,20 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  return List::create(Named("Allocation") = Z,
-                      Named("Proportion_Parameters") = PI,
-                      Named("Mu") = MU,
-                      Named("Precision") = PREC,
-                      Named("Execution_Time") = duration/1000000);
+  if (sum(trueAllocation) != 0) {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Loss") = LOSS,
+                        Named("Execution_Time") = duration/1000000);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Execution_Time") = duration/1000000);
+  }
   
 }
 
@@ -638,9 +735,21 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
 }
 
 
+// arma::imat binAllocMat(arma::ivec allocation, int K) {
+//   int n = allocation.n_elem;
+//   arma::imat allocMat(n, K); 
+//   for (int i = 0; i<n; i++) {
+//     for (int k = 0; k<K; k++) {
+//       allocMat(i, k) = diracF(allocation(i), k);
+//     }
+//   }
+//   return(allocMat)
+// }
+
+
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
-List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method) {
+List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, arma::irowvec trueAllocation) {
   // precision and not variance!!
   // m: how many observation I want to update
   auto start = std::chrono::high_resolution_clock::now();
@@ -663,6 +772,8 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   List MU(nout);
   // SIGMA
   List PREC(nout);
+  // LOSS 
+  arma::vec LOSS(nout);
   ////////////////////////////////////////////////////
   /////////////// Random Gibbs Sampler ///////////////
   ///////////////////////////////////////////////////
@@ -749,6 +860,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
+  double Loss = 0;
   for (int t = 0; t<iteration; t++) {
     // update probability matrix allocation and z
     z = update_allocationRD(pi, mu, prec, X, m, z, alpha);
@@ -769,6 +881,11 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
       PI.row(idx) = pi;
       MU[idx] = mu;
       PREC[idx] = prec;
+      if (sum(trueAllocation) != 0) {
+        Loss = ari(z, trueAllocation);
+        LOSS(idx) = Loss;
+        // cout << "Matrice di Contingenza: \n" << contMat(z, trueAllocation) << "\n";
+      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -778,14 +895,22 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  return List::create(Named("Allocation") = Z,
-                      Named("Proportion_Parameters") = PI,
-                      Named("Mu") = MU,
-                      Named("Precision") = PREC,
-                      Named("Execution_Time") = duration/1000000);
+  if (sum(trueAllocation) != 0) {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Loss") = LOSS,
+                        Named("Execution_Time") = duration/1000000);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Execution_Time") = duration/1000000);
+  }
   
 }
-
 
 
 ////////////////////////////////////////////////////
@@ -808,8 +933,9 @@ NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma
     } 
   } 
   // normalizzo le righe
+  arma::vec rSum = rowSums(probAllocation);
   for (int i = 0; i<n; i++) {
-    probAllocation(i, _) = probAllocation(i, _) / sum(probAllocation(i, _));
+    probAllocation(i, _) = probAllocation(i, _) / rSum(i);
   }
   return(probAllocation);
 }
@@ -842,6 +968,7 @@ NumericVector entropy(NumericMatrix probAllocation) {
   }
   // STEP 3. Normalize the entropy
   double sommaEntropia = sum(Entropy);
+  // check the entropy values
   for (int i = 0; i<n; i++) {
     Entropy(i) = Entropy(i) / sommaEntropia;
   } 
@@ -881,12 +1008,12 @@ arma::irowvec diversity_allocation(NumericVector Diversity, NumericMatrix probAl
     z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
   }
   return(z);
-} 
+}
 
 
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, String diversity) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, String diversity, arma::irowvec trueAllocation) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -912,6 +1039,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   List MU(nout);
   // SIGMA
   List PREC(nout);
+  // ARI Index
+  arma::vec LOSS(nout);
   ////////////////////////////////////////////////////
   /////////////// Random Gibbs Sampler ///////////////
   ///////////////////////////////////////////////////
@@ -990,6 +1119,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
   NumericVector Diversity(n);
+  arma::irowvec N(K);
+  // Loss index
+  double Loss = 0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -1007,7 +1139,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     // update z
     z = diversity_allocation(Diversity, probAllocation, m, z, alpha, t, gamma);
     // compute N
-    arma::irowvec N = sum_allocation(z, K);
+    N = sum_allocation(z, K);
     // update pi
     pi = update_pi(concPar.t(), N);
     // update params
@@ -1024,6 +1156,11 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
       D.row(idx) = Diversity;
       MU[idx] = mu;
       PREC[idx] = prec;
+      if (sum(trueAllocation) != 0) {
+        Loss = ari(z, trueAllocation);
+        LOSS(idx) = Loss;
+        // cout << "Matrice di Contingenza: \n" << contMat(z, trueAllocation) << "\n";
+      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -1033,12 +1170,22 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  return List::create(Named("Allocation") = Z,
-                      Named("Diversity") = D,
-                      Named("Proportion_Parameters") = PI,
-                      Named("Mu") = MU,
-                      Named("Precision") = PREC,
-                      Named("Execution_Time") = duration/1000000);
+  if (sum(trueAllocation) != 0) {
+    return List::create(Named("Allocation") = Z,
+                        Named("Diversity") = D,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Loss") = LOSS,
+                        Named("Execution_Time") = duration/1000000);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Diversity") = D,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Execution_Time") = duration/1000000);
+  }
   
 }
 
@@ -1056,6 +1203,12 @@ arma::mat summary_Posterior(arma::imat z) {
     }
   }
   sumPost = sumPost/M;
+  // cout << "Somma per riga " << sum(sumPost, 0) << "\n";
+  // cout << "Somma per colonna " << sum(sumPost, 1) << "\n";
   return(sumPost);
 }
+
+
+
+
 

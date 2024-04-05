@@ -6,7 +6,7 @@
 \usage{
 DiversityGibbs(
   X,
-  hyper = c(1, 1, 0, 20, 1, 1),
+  hyper = c(1, 1, 0, 0.1, 1, 1),
   K = 3,
   m,
   iteration = 1000,
@@ -14,7 +14,8 @@ DiversityGibbs(
   thin = 5,
   method = "EB",
   gamma = 0.5,
-  diversity = "Entropy"
+  diversity = "Entropy",
+  trueAllocation = numeric(0)
 )
 }
 \description{
