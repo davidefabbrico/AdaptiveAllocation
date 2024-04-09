@@ -310,20 +310,31 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// diversity_allocation
-arma::irowvec diversity_allocation(NumericVector Diversity, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma);
-RcppExport SEXP _AdaptiveAllocation_diversity_allocation(SEXP DiversitySEXP, SEXP probAllocationSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP, SEXP iterSEXP, SEXP gammaSEXP) {
+// update_alpha
+NumericVector update_alpha(int iter, double gamma, NumericVector alpha_prec, NumericVector Diversity);
+RcppExport SEXP _AdaptiveAllocation_update_alpha(SEXP iterSEXP, SEXP gammaSEXP, SEXP alpha_precSEXP, SEXP DiversitySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type iter(iterSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type alpha_prec(alpha_precSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type Diversity(DiversitySEXP);
+    rcpp_result_gen = Rcpp::wrap(update_alpha(iter, gamma, alpha_prec, Diversity));
+    return rcpp_result_gen;
+END_RCPP
+}
+// diversity_allocation
+arma::irowvec diversity_allocation(NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha);
+RcppExport SEXP _AdaptiveAllocation_diversity_allocation(SEXP probAllocationSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
     Rcpp::traits::input_parameter< int >::type m(mSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type alpha(alphaSEXP);
-    Rcpp::traits::input_parameter< int >::type iter(iterSEXP);
-    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
-    rcpp_result_gen = Rcpp::wrap(diversity_allocation(Diversity, probAllocation, m, z, alpha, iter, gamma));
+    rcpp_result_gen = Rcpp::wrap(diversity_allocation(probAllocation, m, z, alpha));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -382,7 +393,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 9},
     {"_AdaptiveAllocation_GSIndex", (DL_FUNC) &_AdaptiveAllocation_GSIndex, 1},
     {"_AdaptiveAllocation_entropy", (DL_FUNC) &_AdaptiveAllocation_entropy, 1},
-    {"_AdaptiveAllocation_diversity_allocation", (DL_FUNC) &_AdaptiveAllocation_diversity_allocation, 7},
+    {"_AdaptiveAllocation_update_alpha", (DL_FUNC) &_AdaptiveAllocation_update_alpha, 4},
+    {"_AdaptiveAllocation_diversity_allocation", (DL_FUNC) &_AdaptiveAllocation_diversity_allocation, 4},
     {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 11},
     {"_AdaptiveAllocation_summary_Posterior", (DL_FUNC) &_AdaptiveAllocation_summary_Posterior, 1},
     {NULL, NULL, 0}

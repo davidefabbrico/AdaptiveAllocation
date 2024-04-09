@@ -85,8 +85,12 @@ entropy <- function(probAllocation) {
     .Call(`_AdaptiveAllocation_entropy`, probAllocation)
 }
 
-diversity_allocation <- function(Diversity, probAllocation, m, z, alpha, iter, gamma) {
-    .Call(`_AdaptiveAllocation_diversity_allocation`, Diversity, probAllocation, m, z, alpha, iter, gamma)
+update_alpha <- function(iter, gamma, alpha_prec, Diversity) {
+    .Call(`_AdaptiveAllocation_update_alpha`, iter, gamma, alpha_prec, Diversity)
+}
+
+diversity_allocation <- function(probAllocation, m, z, alpha) {
+    .Call(`_AdaptiveAllocation_diversity_allocation`, probAllocation, m, z, alpha)
 }
 
 DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity, trueAllocation) {

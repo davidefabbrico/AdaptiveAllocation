@@ -752,6 +752,7 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
 List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, arma::irowvec trueAllocation) {
   // precision and not variance!!
   // m: how many observation I want to update
+  
   auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
@@ -782,9 +783,6 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   for (int i = 0; i<n; i++) {
     alpha(i) = 1.0/n;
   }
-  ////////////////////////////////////////////////////
-  ////////// Emprical bayes prior settings ///////////
-  ///////////////////////////////////////////////////
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -860,6 +858,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
+  
   double Loss = 0;
   for (int t = 0; t<iteration; t++) {
     // update probability matrix allocation and z
@@ -893,6 +892,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
     }
   }
   std::cout << "End MCMC!\n";
+  
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   if (sum(trueAllocation) != 0) {
@@ -916,6 +916,21 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
 ////////////////////////////////////////////////////
 ////////// Entropy-Guided Gibbs Sampler ///////////
 //////////////////////////////////////////////////
+
+arma::mat customMatrix(arma::irowvec z) {
+  int n = z.n_elem;
+  arma::mat A = arma::zeros<arma::mat>(n, n);
+  for (int i = 0; i<n; i++) {
+    for (int j = 0; j<n; j++) {
+      if (z(i) == z(j)) {
+        A(i, j) = 1;
+      }
+    }
+  }
+  return(A);
+}
+
+
 NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X) {
   int K = pi.n_elem; // numero di cluster
   int n = X.n_rows; // numero di osservazioni
@@ -975,24 +990,38 @@ NumericVector entropy(NumericMatrix probAllocation) {
   return(Entropy);
 }
 
+
 // [[Rcpp::export]]
-arma::irowvec diversity_allocation(NumericVector Diversity, NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha, int iter, double gamma) {
-  // pi sono le proporzioni di ogni cluster
-  // mu è la media a posteriori
-  // sigma è la varianza a posteriori
-  // x dati
-  int K = probAllocation.ncol(); // numero di cluster
-  int n = probAllocation.nrow(); // numero di osservazioni
-  // STEP 4. Update weight
+NumericVector update_alpha(int iter, double gamma, NumericVector alpha_prec, NumericVector Diversity) {
+  int n = alpha_prec.size();
   NumericVector constVal(n); // in this case the weights are setting equally to 1/n
+  NumericVector alpha(n);
   for (int i = 0; i<n; i++) {
     constVal(i) = 1.0/n;
   }
   if (iter == 0) {
     alpha = constVal; // da capire...
   } else {
-    alpha = alpha*((iter-1.0)/iter)+(1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
+    alpha = alpha_prec*((iter-1.0)/iter)+(1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
   }
+  // NumericVector difference(n);
+  // difference = alpha-alpha_prec;
+  // cout << "Difference \n" << difference << "\n";
+  // NumericVector secondTerm = (1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
+  // NumericVector firstTerm = alpha_prec*((iter-1.0)/iter);
+  // cout << "First Term \n" << firstTerm << "\n";
+  // cout << "Second Term \n" << secondTerm << "\n";
+  return(alpha);
+}
+
+// [[Rcpp::export]]
+arma::irowvec diversity_allocation(NumericMatrix probAllocation, int m, arma::irowvec z, NumericVector alpha) {
+  // pi sono le proporzioni di ogni cluster
+  // mu è la media a posteriori
+  // sigma è la varianza a posteriori
+  // x dati
+  int K = probAllocation.ncol(); // numero di cluster
+  int n = probAllocation.nrow(); // numero di osservazioni
   // Update the allocation
   NumericVector indI(n);
   for (int i = 0; i<n; i++) {
@@ -1031,6 +1060,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   int idx = 0;
   // Z
   arma::imat Z(nout, n);
+  // ALPHA
+  NumericMatrix ALPHA(nout, n);
   // PI
   arma::mat PI(nout, K);
   // Entropy
@@ -1128,6 +1159,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   for (int t = 0; t<iteration; t++) {
     // update probability 
     probAllocation = comp_ProbAlloc(pi, mu, prec, X);
+    // update alpha
     if (diversity == "Entropy") {
       // compute entropy
       Diversity = entropy(probAllocation); 
@@ -1136,8 +1168,10 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     } else {
       cout << "You need to specify a Diversity Index!" << "\n";
     }
+    // update alpha
+    alpha = update_alpha(t, gamma, alpha, Diversity);
     // update z
-    z = diversity_allocation(Diversity, probAllocation, m, z, alpha, t, gamma);
+    z = diversity_allocation(probAllocation, m, z, alpha);
     // compute N
     N = sum_allocation(z, K);
     // update pi
@@ -1152,6 +1186,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     ///////////////////////////////////////////////////
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
+      ALPHA.row(idx) = alpha;
       PI.row(idx) = pi;
       D.row(idx) = Diversity;
       MU[idx] = mu;
@@ -1177,6 +1212,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
                         Named("Mu") = MU,
                         Named("Precision") = PREC,
                         Named("Loss") = LOSS,
+                        Named("Alpha") = ALPHA,
                         Named("Execution_Time") = duration/1000000);
   } else {
     return List::create(Named("Allocation") = Z,
@@ -1184,6 +1220,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
                         Named("Proportion_Parameters") = PI,
                         Named("Mu") = MU,
                         Named("Precision") = PREC,
+                        Named("Alpha") = ALPHA,
                         Named("Execution_Time") = duration/1000000);
   }
   
@@ -1211,4 +1248,7 @@ arma::mat summary_Posterior(arma::imat z) {
 
 
 
+////////////////////////////////////////////////////
+/////////////// Categorical Data //////////////////
+///////////////////////////////////////////////////
 
