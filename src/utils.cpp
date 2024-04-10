@@ -999,11 +999,15 @@ NumericVector update_alpha(int iter, double gamma, NumericVector alpha_prec, Num
   for (int i = 0; i<n; i++) {
     constVal(i) = 1.0/n;
   }
-  if (iter == 0) {
+  if (iter == 0 || iter == 1) {
     alpha = constVal; // da capire...
   } else {
     alpha = alpha_prec*((iter-1.0)/iter)+(1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
   }
+  // cout << sum(alpha) << "\n";
+  // NumericVector a = gamma*Diversity;
+  // cout << Diversity << "\n";
+  // cout << a << "\n";
   // NumericVector difference(n);
   // difference = alpha-alpha_prec;
   // cout << "Difference \n" << difference << "\n";
@@ -1033,6 +1037,7 @@ arma::irowvec diversity_allocation(NumericMatrix probAllocation, int m, arma::ir
   } 
   NumericVector rI(m);
   rI = csample_num(indI, m, false, alpha); // without replace
+  // cout << rI << "\n";
   for (int i = 0; i<m; i++) {
     z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
   }
@@ -1096,6 +1101,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     for (int j = 0; j<d; j++) {
       hyper_mu_mean(j) = hyper(2);
     } 
+    // hyper_mu_mean = mean(X, 0);
     hyper_prec_b = hyper(5);
     for (int k = 0; k<K; k++) {
       hyper_mu_prec.row(k) = hyper(3)*arma::ones<arma::rowvec>(d);
