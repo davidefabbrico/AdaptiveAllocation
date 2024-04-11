@@ -253,11 +253,12 @@ BEGIN_RCPP
 END_RCPP
 }
 // update_allocationRD
-arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha);
-RcppExport SEXP _AdaptiveAllocation_update_allocationRD(SEXP piSEXP, SEXP muSEXP, SEXP precSEXP, SEXP XSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP) {
+arma::irowvec update_allocationRD(NumericMatrix probAllocation, arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha);
+RcppExport SEXP _AdaptiveAllocation_update_allocationRD(SEXP probAllocationSEXP, SEXP piSEXP, SEXP muSEXP, SEXP precSEXP, SEXP XSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
     Rcpp::traits::input_parameter< arma::rowvec >::type pi(piSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
@@ -265,7 +266,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type m(mSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type alpha(alphaSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_allocationRD(pi, mu, prec, X, m, z, alpha));
+    rcpp_result_gen = Rcpp::wrap(update_allocationRD(probAllocation, pi, mu, prec, X, m, z, alpha));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -389,7 +390,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_update_muDH", (DL_FUNC) &_AdaptiveAllocation_update_muDH, 6},
     {"_AdaptiveAllocation_update_muD", (DL_FUNC) &_AdaptiveAllocation_update_muD, 6},
     {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 8},
-    {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 7},
+    {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 8},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 9},
     {"_AdaptiveAllocation_GSIndex", (DL_FUNC) &_AdaptiveAllocation_GSIndex, 1},
     {"_AdaptiveAllocation_entropy", (DL_FUNC) &_AdaptiveAllocation_entropy, 1},

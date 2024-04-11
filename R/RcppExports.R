@@ -69,8 +69,8 @@ DSSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAllocation) {
     .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin, method, trueAllocation)
 }
 
-update_allocationRD <- function(pi, mu, prec, X, m, z, alpha) {
-    .Call(`_AdaptiveAllocation_update_allocationRD`, pi, mu, prec, X, m, z, alpha)
+update_allocationRD <- function(probAllocation, pi, mu, prec, X, m, z, alpha) {
+    .Call(`_AdaptiveAllocation_update_allocationRD`, probAllocation, pi, mu, prec, X, m, z, alpha)
 }
 
 RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method, trueAllocation) {
