@@ -12,7 +12,7 @@ using namespace std;
 
 // TODO
 // [X] data in d-dimension
-// [~] How to set the Hyperparameters?
+// [X] How to set the Hyperparameters?
 // From Bayesian Regularization for Normal Mixture Estimation and Model-Based Clustering 
 // by Fraley and Raftery page 159-160. We have 4 more hyperparameters:
 // 1. mu ~ N(muP, sigma^2/kP)
@@ -26,7 +26,7 @@ using namespace std;
 // Emphasise the color
 // [X] How to summarize the posterior? (in C++)
 // [ ] Code Optimization
-// [ ] Check the full conditional with the new Regularization
+// [X] Check the full conditional with the new Regularization
 // [ ] Evaluate Convergence
 // [ ] How many time I need to update the Prob Allocation Matrix?
 
@@ -693,7 +693,7 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
 ///////////////////////////////////////////////////
 
 // [[Rcpp::export]]
-arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha) {
+arma::irowvec update_allocationRD(NumericMatrix probAllocation, arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha) {
   // pi sono le proporzioni di ogni cluster
   // mu è la media a posteriori
   // sigma è la varianza a posteriori
@@ -704,7 +704,7 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
   int n = X.n_rows;
   int d = X.n_cols; // numero di covariate
   arma::vec vecTmp(d);
-  NumericMatrix probAllocation(n, K);
+  // NumericMatrix probAllocation(n, K);
   NumericVector indI(n);
   for (int i = 0; i<n; i++) {
     indI(i) = i;
@@ -715,9 +715,11 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
   }
   NumericVector rI(m);
   rI = csample_num(indI, m, false, alpha); // without replace
+  // cout << "Lunghezza rI " << rI.size() << "\n";
+  // cout << "M " << m << "\n";
   for (int i = 0; i<m; i++) {
     for (int k = 0; k<K; k++) {
-      arma::vec vecTmp = arma::zeros<arma::vec>(d);
+      // arma::vec vecTmp = arma::zeros<arma::vec>(d);
       for (int j = 0; j<d; j++) {
         vecTmp(j) = R::dnorm(X(rI[i],j), mu(k,j), sqrt(1/prec(k,j)), FALSE);
       }
@@ -729,9 +731,12 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
   for (int i = 0; i<m; i++) {
     probAllocation(rI[i], _) = probAllocation(rI[i], _) / rSum(rI[i]);
   }
+  // cout << "Somma per colonna Random " << colSums(probAllocation) << "\n";
   for (int i = 0; i<m; i++) {
     z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
   }
+  // cout << "Matrice di Prob: " << probAllocation << "\n";
+  // cout << "Allocation: " << z << "\n";
   return(z);
 }
 
@@ -839,11 +844,11 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   List allocation(2);
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
-  for (int i = 0; i<n; i++) {
-    for (int k = 0; k<K; k++) {
-      probAllocation(i,k) = 1.0/K;
-    }
-  }
+  // for (int i = 0; i<n; i++) {
+  //   for (int k = 0; k<K; k++) {
+  //     probAllocation(i,k) = 1.0/K;
+  //   }
+  // }
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -851,7 +856,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   double Loss = 0;
   for (int t = 0; t<iteration; t++) {
     // update probability matrix allocation and z
-    z = update_allocationRD(pi, mu, prec, X, m, z, alpha);
+    z = update_allocationRD(probAllocation, pi, mu, prec, X, m, z, alpha);
     // compute N
     arma::irowvec N = sum_allocation(z, K);
     // update pi
@@ -929,18 +934,20 @@ NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma
   // STEP 1. Compute the probability
   for (int i = 0; i<n; i++) {
     for (int k = 0; k<K; k++) {
-      arma::vec vecTmp = arma::zeros<arma::vec>(d);
+      // arma::vec vecTmp = arma::zeros<arma::vec>(d);
       for (int j = 0; j<d; j++) {
         vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1/prec(k,j)), FALSE);
       }
       probAllocation(i,k) = pi(k)*myProduct(vecTmp);
     } 
-  } 
+  }
+  // cout << "Prob Allocation " << probAllocation << "\n";
   // normalizzo le righe
   arma::vec rSum = rowSums(probAllocation);
   for (int i = 0; i<n; i++) {
     probAllocation(i, _) = probAllocation(i, _) / rSum(i);
   }
+  // cout << "Somma per colonna Adaptive " << colSums(probAllocation) << "\n";
   return(probAllocation);
 }
 
@@ -996,6 +1003,7 @@ NumericVector update_alpha(int iter, double gamma, NumericVector alpha_prec, Num
     constVal(i) = 1.0/n;
   }
   // cout << "Questo è alpha prima: " << alpha_prec << "\n";
+  // cout << Diversity << "\n";
   if (iter == 0 || iter == 1) {
     alpha = gamma*Diversity+(1-gamma)*constVal;// constVal;
   } else {
