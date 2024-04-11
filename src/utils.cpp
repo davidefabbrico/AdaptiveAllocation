@@ -982,6 +982,7 @@ NumericVector entropy(NumericMatrix probAllocation) {
   for (int i = 0; i<n; i++) {
     Entropy(i) = Entropy(i) / sommaEntropia;
   } 
+  // cout << "Somma Entropia: " << sum(Entropy) << "\n";
   return(Entropy);
 }
 
@@ -994,11 +995,21 @@ NumericVector update_alpha(int iter, double gamma, NumericVector alpha_prec, Num
   for (int i = 0; i<n; i++) {
     constVal(i) = 1.0/n;
   }
+  // cout << "Questo è alpha prima: " << alpha_prec << "\n";
   if (iter == 0 || iter == 1) {
-    alpha = constVal;
+    alpha = gamma*Diversity+(1-gamma)*constVal;// constVal;
   } else {
     alpha = alpha_prec*((iter-1.0)/iter)+(1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
   }
+  // NumericVector a = (1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
+  // cout << "Questo è quello che gli aggiungo: " << a << "\n";
+  // cout << "Questo è alpha dopo: " << alpha << "\n";
+  // Normalizzo alpha
+  // double sommaAlpha = sum(alpha);
+  // // check the entropy values
+  // for (int i = 0; i<n; i++) {
+  //   alpha(i) = alpha(i) / sommaAlpha;
+  // } 
   return(alpha);
 }
 
