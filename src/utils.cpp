@@ -725,26 +725,15 @@ arma::irowvec update_allocationRD(arma::rowvec pi, arma::mat mu, arma::mat prec,
     }
   }
   // normalizzo le righe
+  arma::vec rSum = rowSums(probAllocation);
   for (int i = 0; i<m; i++) {
-    probAllocation(rI[i], _) = probAllocation(rI[i], _) / sum(probAllocation(rI[i], _));
+    probAllocation(rI[i], _) = probAllocation(rI[i], _) / rSum(rI[i]);
   }
   for (int i = 0; i<m; i++) {
     z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
   }
   return(z);
 }
-
-
-// arma::imat binAllocMat(arma::ivec allocation, int K) {
-//   int n = allocation.n_elem;
-//   arma::imat allocMat(n, K); 
-//   for (int i = 0; i<n; i++) {
-//     for (int k = 0; k<K; k++) {
-//       allocMat(i, k) = diracF(allocation(i), k);
-//     }
-//   }
-//   return(allocMat)
-// }
 
 
 // Random Gibbs sampler d-dimensional
@@ -966,6 +955,12 @@ NumericVector GSIndex(NumericMatrix probAllocation) {
     }
     GSimpson(i) = 1 - GSimpson(i);
   }
+  // Normalize
+  double sumSimp = sum(GSimpson);
+  // check the entropy values
+  for (int i = 0; i<n; i++) {
+    GSimpson(i) = GSimpson(i) / sumSimp;
+  } 
   return(GSimpson);
 }
 
@@ -1000,21 +995,10 @@ NumericVector update_alpha(int iter, double gamma, NumericVector alpha_prec, Num
     constVal(i) = 1.0/n;
   }
   if (iter == 0 || iter == 1) {
-    alpha = constVal; // da capire...
+    alpha = constVal;
   } else {
     alpha = alpha_prec*((iter-1.0)/iter)+(1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
   }
-  // cout << sum(alpha) << "\n";
-  // NumericVector a = gamma*Diversity;
-  // cout << Diversity << "\n";
-  // cout << a << "\n";
-  // NumericVector difference(n);
-  // difference = alpha-alpha_prec;
-  // cout << "Difference \n" << difference << "\n";
-  // NumericVector secondTerm = (1.0/iter)*(gamma*Diversity+(1-gamma)*constVal);
-  // NumericVector firstTerm = alpha_prec*((iter-1.0)/iter);
-  // cout << "First Term \n" << firstTerm << "\n";
-  // cout << "Second Term \n" << secondTerm << "\n";
   return(alpha);
 }
 
@@ -1077,9 +1061,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   List PREC(nout);
   // ARI Index
   arma::vec LOSS(nout);
-  ////////////////////////////////////////////////////
-  /////////////// Random Gibbs Sampler ///////////////
-  ///////////////////////////////////////////////////
   // Alpha weight
   NumericVector alpha(n); // start from 1/n
   for (int i = 0; i<n; i++) {
@@ -1165,7 +1146,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   for (int t = 0; t<iteration; t++) {
     // update probability 
     probAllocation = comp_ProbAlloc(pi, mu, prec, X);
-    // update alpha
     if (diversity == "Entropy") {
       // compute entropy
       Diversity = entropy(probAllocation); 
