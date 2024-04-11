@@ -45,7 +45,6 @@ library(MASS)
 library(ellipse)
 library(ggplot2)
 
-# try with this setting: set.seed(10) mu1 <- c(10, 10.5), mu2 <- c(5.5, 10.5), d <- 2, n <- 1100
 # number of dimension
 d <- 2
 # number of observation
@@ -142,10 +141,3 @@ print(AdaptiveAllocation::scattPlot2d(res = resA, data = data, diversity = T))
 plot(1:iter, saveChainSys[,1], type = "l", ylab = "ARI", ylim = c(0, 1))
 lines(1:iter, saveChainRandom[,1], col = "red")
 lines(1:iter, saveChainAdaptive[,1], col = "green")
-
-
-
-                                
-
-
-
