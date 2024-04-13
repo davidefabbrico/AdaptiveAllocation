@@ -693,16 +693,21 @@ List DSSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int th
 ///////////////////////////////////////////////////
 
 // [[Rcpp::export]]
-arma::irowvec update_allocationRD(NumericMatrix probAllocation, arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha) {
-  // pi sono le proporzioni di ogni cluster
-  // mu è la media a posteriori
-  // sigma è la varianza a posteriori
-  // x dati
-  // m sono quanti ne voglio aggiornare
-  // z è il "vecchio" vettore di allocazione per ogni individuo
-  int K = pi.n_elem; // numero di cluster
+NumericVector sample_random(int n, int m, NumericVector alpha) {
+  NumericVector indI(n);
+  for (int i = 0; i<n; i++) {
+    indI(i) = i;
+  }
+  NumericVector rI(m);
+  rI = csample_num(indI, m, false, alpha); // without replace
+  return(rI);
+}
+
+// [[Rcpp::export]]
+NumericMatrix comp_probAllocationRandom(arma::mat X, int m, arma::mat mu, arma::mat prec, NumericMatrix probAlloc_old, arma::rowvec pi, NumericVector rI) {
+  int K = pi.n_elem;
   int n = X.n_rows;
-  int d = X.n_cols; // numero di covariate
+  int d = X.n_cols;
   arma::vec vecTmp(d);
   // NumericMatrix probAllocation(n, K);
   NumericVector indI(n);
@@ -713,8 +718,7 @@ arma::irowvec update_allocationRD(NumericMatrix probAllocation, arma::rowvec pi,
   for (int k = 0; k<K; k++) {
     indC(k) = k;
   }
-  NumericVector rI(m);
-  rI = csample_num(indI, m, false, alpha); // without replace
+  NumericMatrix probAllocation(n, K);
   // cout << "Lunghezza rI " << rI.size() << "\n";
   // cout << "M " << m << "\n";
   for (int i = 0; i<m; i++) {
@@ -731,7 +735,21 @@ arma::irowvec update_allocationRD(NumericMatrix probAllocation, arma::rowvec pi,
   for (int i = 0; i<m; i++) {
     probAllocation(rI[i], _) = probAllocation(rI[i], _) / rSum(rI[i]);
   }
-  // cout << "Somma per colonna Random " << colSums(probAllocation) << "\n";
+  return(probAllocation);
+}
+
+// [[Rcpp::export]]
+arma::irowvec update_allocationRD(NumericMatrix probAllocation, int K, int m, arma::irowvec z, NumericVector rI) {
+  // pi sono le proporzioni di ogni cluster
+  // mu è la media a posteriori
+  // sigma è la varianza a posteriori
+  // x dati
+  // m sono quanti ne voglio aggiornare
+  // z è il "vecchio" vettore di allocazione per ogni individuo
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
   for (int i = 0; i<m; i++) {
     z(rI[i]) = csample_num(indC, 1, true, probAllocation(rI[i], _))(0);
   }
@@ -849,14 +867,18 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   //     probAllocation(i,k) = 1.0/K;
   //   }
   // }
+  NumericVector rI(m);
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
-  
   double Loss = 0;
   for (int t = 0; t<iteration; t++) {
-    // update probability matrix allocation and z
-    z = update_allocationRD(probAllocation, pi, mu, prec, X, m, z, alpha);
+    // uniform sample
+    rI = sample_random(n, m, alpha);
+    // update probability matrix allocation
+    probAllocation = comp_probAllocationRandom(X, m, mu, prec, probAllocation, pi, rI);
+    // update the allocation vector
+    z = update_allocationRD(probAllocation, K, m, z, rI);
     // compute N
     arma::irowvec N = sum_allocation(z, K);
     // update pi
@@ -1082,9 +1104,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   arma::vec LOSS(nout);
   // Alpha weight
   NumericVector alpha(n); // start from 1/n
-  for (int i = 0; i<n; i++) {
-    alpha(i) = 1.0/n; // sample
-  } 
+  // for (int i = 0; i<n; i++) {
+  //   alpha(i) = 1.0/n; // sample
+  // } 
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -1151,8 +1173,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   } 
   // cout << "Mean \n " << hyper_mu_mean << "\n";
   // cout  << "Variance \n " << sqrt(hyper_prec) << "\n";
-  // Store allocation
-  List allocation(2);
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
   NumericVector Diversity(n);
@@ -1163,7 +1183,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
-    // update probability 
+    // update probability
     probAllocation = comp_ProbAlloc(pi, mu, prec, X);
     if (diversity == "Entropy") {
       // compute entropy
