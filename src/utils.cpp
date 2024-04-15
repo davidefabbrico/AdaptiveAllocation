@@ -1206,6 +1206,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     } 
     hyper_prec_a = hyper(4);
   } 
+  if (q < 0) {
+    cout << "q should be greater or equal to 0!" << "\n";
+  }
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
