@@ -14,8 +14,9 @@ DiversityGibbs(
   thin = 5,
   method = "EB",
   gamma = 0.5,
-  diversity = "Entropy",
-  trueAllocation = numeric(0)
+  trueAllocation = numeric(0),
+  adaptiveGamma = TRUE,
+  q = 1
 )
 }
 \description{

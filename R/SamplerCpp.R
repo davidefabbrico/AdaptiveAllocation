@@ -48,9 +48,10 @@ rssg <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, m = 10, iteration = 10
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-DiversityGibbs <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "EB", gamma = 0.5, diversity = "Entropy", trueAllocation = numeric(0)) {
+DiversityGibbs <- function(X, hyper = c(1, 1, 0, 0.1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "EB", gamma = 0.5, trueAllocation = numeric(0), adaptiveGamma = TRUE, q = 1) {
   res <- DiversityGibbsSamp(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method),
-              as.double(gamma), as.character(diversity), as.vector(trueAllocation))
+              as.double(gamma), as.vector(trueAllocation), as.logical(adaptiveGamma),
+              as.double(q))
   return(res)
 }

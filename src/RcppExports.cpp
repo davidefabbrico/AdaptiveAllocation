@@ -252,21 +252,48 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_random
+NumericVector sample_random(int n, int m, NumericVector alpha);
+RcppExport SEXP _AdaptiveAllocation_sample_random(SEXP nSEXP, SEXP mSEXP, SEXP alphaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type alpha(alphaSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_random(n, m, alpha));
+    return rcpp_result_gen;
+END_RCPP
+}
+// comp_probAllocationRandom
+NumericMatrix comp_probAllocationRandom(arma::mat X, int m, arma::mat mu, arma::mat prec, NumericMatrix probAlloc_old, arma::rowvec pi, NumericVector rI);
+RcppExport SEXP _AdaptiveAllocation_comp_probAllocationRandom(SEXP XSEXP, SEXP mSEXP, SEXP muSEXP, SEXP precSEXP, SEXP probAlloc_oldSEXP, SEXP piSEXP, SEXP rISEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type probAlloc_old(probAlloc_oldSEXP);
+    Rcpp::traits::input_parameter< arma::rowvec >::type pi(piSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type rI(rISEXP);
+    rcpp_result_gen = Rcpp::wrap(comp_probAllocationRandom(X, m, mu, prec, probAlloc_old, pi, rI));
+    return rcpp_result_gen;
+END_RCPP
+}
 // update_allocationRD
-arma::irowvec update_allocationRD(NumericMatrix probAllocation, arma::rowvec pi, arma::mat mu, arma::mat prec, arma::mat X, int m, arma::irowvec z, NumericVector alpha);
-RcppExport SEXP _AdaptiveAllocation_update_allocationRD(SEXP probAllocationSEXP, SEXP piSEXP, SEXP muSEXP, SEXP precSEXP, SEXP XSEXP, SEXP mSEXP, SEXP zSEXP, SEXP alphaSEXP) {
+arma::irowvec update_allocationRD(NumericMatrix probAllocation, int K, int m, arma::irowvec z, NumericVector rI);
+RcppExport SEXP _AdaptiveAllocation_update_allocationRD(SEXP probAllocationSEXP, SEXP KSEXP, SEXP mSEXP, SEXP zSEXP, SEXP rISEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
-    Rcpp::traits::input_parameter< arma::rowvec >::type pi(piSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type prec(precSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
     Rcpp::traits::input_parameter< int >::type m(mSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type z(zSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type alpha(alphaSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_allocationRD(probAllocation, pi, mu, prec, X, m, z, alpha));
+    Rcpp::traits::input_parameter< NumericVector >::type rI(rISEXP);
+    rcpp_result_gen = Rcpp::wrap(update_allocationRD(probAllocation, K, m, z, rI));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -286,6 +313,30 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< String >::type method(methodSEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type trueAllocation(trueAllocationSEXP);
     rcpp_result_gen = Rcpp::wrap(RSSG(X, hyper, K, m, iteration, burnin, thin, method, trueAllocation));
+    return rcpp_result_gen;
+END_RCPP
+}
+// generalizedBG
+NumericVector generalizedBG(NumericMatrix probAllocation, double q);
+RcppExport SEXP _AdaptiveAllocation_generalizedBG(SEXP probAllocationSEXP, SEXP qSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type probAllocation(probAllocationSEXP);
+    Rcpp::traits::input_parameter< double >::type q(qSEXP);
+    rcpp_result_gen = Rcpp::wrap(generalizedBG(probAllocation, q));
+    return rcpp_result_gen;
+END_RCPP
+}
+// JS_distance
+double JS_distance(NumericVector p, NumericVector q);
+RcppExport SEXP _AdaptiveAllocation_JS_distance(SEXP pSEXP, SEXP qSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type p(pSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type q(qSEXP);
+    rcpp_result_gen = Rcpp::wrap(JS_distance(p, q));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -340,8 +391,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // DiversityGibbsSamp
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, String diversity, arma::irowvec trueAllocation);
-RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP diversitySEXP, SEXP trueAllocationSEXP) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, double q);
+RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP trueAllocationSEXP, SEXP adaptiveGammaSEXP, SEXP qSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -354,9 +405,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
     Rcpp::traits::input_parameter< String >::type method(methodSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
-    Rcpp::traits::input_parameter< String >::type diversity(diversitySEXP);
     Rcpp::traits::input_parameter< arma::irowvec >::type trueAllocation(trueAllocationSEXP);
-    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity, trueAllocation));
+    Rcpp::traits::input_parameter< bool >::type adaptiveGamma(adaptiveGammaSEXP);
+    Rcpp::traits::input_parameter< double >::type q(qSEXP);
+    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, thin, method, gamma, trueAllocation, adaptiveGamma, q));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -390,13 +442,17 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_update_muDH", (DL_FUNC) &_AdaptiveAllocation_update_muDH, 6},
     {"_AdaptiveAllocation_update_muD", (DL_FUNC) &_AdaptiveAllocation_update_muD, 6},
     {"_AdaptiveAllocation_DSSG", (DL_FUNC) &_AdaptiveAllocation_DSSG, 8},
-    {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 8},
+    {"_AdaptiveAllocation_sample_random", (DL_FUNC) &_AdaptiveAllocation_sample_random, 3},
+    {"_AdaptiveAllocation_comp_probAllocationRandom", (DL_FUNC) &_AdaptiveAllocation_comp_probAllocationRandom, 7},
+    {"_AdaptiveAllocation_update_allocationRD", (DL_FUNC) &_AdaptiveAllocation_update_allocationRD, 5},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 9},
+    {"_AdaptiveAllocation_generalizedBG", (DL_FUNC) &_AdaptiveAllocation_generalizedBG, 2},
+    {"_AdaptiveAllocation_JS_distance", (DL_FUNC) &_AdaptiveAllocation_JS_distance, 2},
     {"_AdaptiveAllocation_GSIndex", (DL_FUNC) &_AdaptiveAllocation_GSIndex, 1},
     {"_AdaptiveAllocation_entropy", (DL_FUNC) &_AdaptiveAllocation_entropy, 1},
     {"_AdaptiveAllocation_update_alpha", (DL_FUNC) &_AdaptiveAllocation_update_alpha, 4},
     {"_AdaptiveAllocation_diversity_allocation", (DL_FUNC) &_AdaptiveAllocation_diversity_allocation, 4},
-    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 11},
+    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 12},
     {"_AdaptiveAllocation_summary_Posterior", (DL_FUNC) &_AdaptiveAllocation_summary_Posterior, 1},
     {NULL, NULL, 0}
 };

@@ -69,12 +69,28 @@ DSSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAllocation) {
     .Call(`_AdaptiveAllocation_DSSG`, X, hyper, K, iteration, burnin, thin, method, trueAllocation)
 }
 
-update_allocationRD <- function(probAllocation, pi, mu, prec, X, m, z, alpha) {
-    .Call(`_AdaptiveAllocation_update_allocationRD`, probAllocation, pi, mu, prec, X, m, z, alpha)
+sample_random <- function(n, m, alpha) {
+    .Call(`_AdaptiveAllocation_sample_random`, n, m, alpha)
+}
+
+comp_probAllocationRandom <- function(X, m, mu, prec, probAlloc_old, pi, rI) {
+    .Call(`_AdaptiveAllocation_comp_probAllocationRandom`, X, m, mu, prec, probAlloc_old, pi, rI)
+}
+
+update_allocationRD <- function(probAllocation, K, m, z, rI) {
+    .Call(`_AdaptiveAllocation_update_allocationRD`, probAllocation, K, m, z, rI)
 }
 
 RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method, trueAllocation) {
     .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method, trueAllocation)
+}
+
+generalizedBG <- function(probAllocation, q) {
+    .Call(`_AdaptiveAllocation_generalizedBG`, probAllocation, q)
+}
+
+JS_distance <- function(p, q) {
+    .Call(`_AdaptiveAllocation_JS_distance`, p, q)
 }
 
 GSIndex <- function(probAllocation) {
@@ -93,8 +109,8 @@ diversity_allocation <- function(probAllocation, m, z, alpha) {
     .Call(`_AdaptiveAllocation_diversity_allocation`, probAllocation, m, z, alpha)
 }
 
-DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity, trueAllocation) {
-    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, diversity, trueAllocation)
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, trueAllocation, adaptiveGamma, q) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, trueAllocation, adaptiveGamma, q)
 }
 
 summary_Posterior <- function(z) {

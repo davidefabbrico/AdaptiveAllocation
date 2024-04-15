@@ -969,14 +969,83 @@ NumericMatrix comp_ProbAlloc(arma::rowvec pi, arma::mat mu, arma::mat prec, arma
   for (int i = 0; i<n; i++) {
     probAllocation(i, _) = probAllocation(i, _) / rSum(i);
   }
+  // cout << "Prob Allocation " << probAllocation << "\n";
   // cout << "Somma per colonna Adaptive " << colSums(probAllocation) << "\n";
   return(probAllocation);
+}
+
+// [[Rcpp::export]]
+NumericVector generalizedBG(NumericMatrix probAllocation, double q) {
+  int K = probAllocation.ncol(); // numero di cluster
+  int n = probAllocation.nrow(); // numero di osservazioni
+  NumericVector constVal(n); // in this case the weights are setting equally to 1/n
+  for (int i = 0; i<n; i++) {
+    constVal(i) = 1.0/n;
+  }
+  NumericVector BG(n);
+  if (q == 1) {
+    for (int i = 0; i<n; i++) {
+      for (int k = 0; k<K; k++) {
+        if (probAllocation(i, k) == 0) {
+          BG(i) = -1.0/n;
+        } else {
+          BG(i) = BG(i) + probAllocation(i, k)*log2(probAllocation(i, k));
+        }
+      }
+      BG(i) = -BG(i);
+    }
+  } else {
+    for (int i = 0; i<n; i++) {
+      for (int k = 0; k<K; k++) {
+        BG(i) = BG(i) + pow(probAllocation(i, k), q);
+      }
+      BG(i) = (1 - BG(i))/(q-1);
+    }
+  }
+  // Normalize
+  double sumDiv = sum(BG);
+  if (sumDiv == 0) {
+    BG = constVal;
+  } else {
+    for (int i = 0; i<n; i++) {
+      BG(i) = BG(i) / sumDiv;
+    } 
+  }
+  return(BG);
+}
+
+// [[Rcpp::export]]
+double JS_distance(NumericVector p, NumericVector q) {
+  int n = p.size();
+  NumericVector D_KL_p(n);
+  NumericVector D_KL_q(n);
+  // cout << "p " << p << "n";
+  // cout << "q " << q << "n";
+  NumericVector meanDist = 0.5*(p+q);
+  // cout << "mean distance " << meanDist << "\n";
+  for (int i = 0; i<n; i++) {
+    D_KL_p(i) = p(i)*log2((p(i)/meanDist(i)) + 0.000001);
+    D_KL_q(i) = q(i)*log2((q(i)/meanDist(i)) + 0.000001);
+  }
+  // Levare gli NA
+  // cout << D_KL_p << "\n";
+  // cout << D_KL_q << "\n";
+  double sum_D_KL_p = sum(D_KL_p);
+  double sum_D_KL_q = sum(D_KL_q);
+  // cout << sum_D_KL_p << "\n";
+  // cout << sum_D_KL_q << "\n";
+  double distance = 0.5 * (sum_D_KL_p + sum_D_KL_q);
+  return(distance);
 }
 
 // [[Rcpp::export]]
 NumericVector GSIndex(NumericMatrix probAllocation) {
   int K = probAllocation.ncol(); // numero di cluster
   int n = probAllocation.nrow(); // numero di osservazioni
+  NumericVector constVal(n); // in this case the weights are setting equally to 1/n
+  for (int i = 0; i<n; i++) {
+    constVal(i) = 1.0/n;
+  }
   NumericVector GSimpson(n);
   for (int i = 0; i<n; i++) {
     for (int k = 0; k<K; k++) {
@@ -986,10 +1055,13 @@ NumericVector GSIndex(NumericMatrix probAllocation) {
   }
   // Normalize
   double sumSimp = sum(GSimpson);
-  // check the entropy values
-  for (int i = 0; i<n; i++) {
-    GSimpson(i) = GSimpson(i) / sumSimp;
-  } 
+  if (sumSimp == 0) {
+    GSimpson = constVal;
+  } else {
+    for (int i = 0; i<n; i++) {
+      GSimpson(i) = GSimpson(i) / sumSimp;
+    } 
+  }
   return(GSimpson);
 }
 
@@ -1001,17 +1073,19 @@ NumericVector entropy(NumericMatrix probAllocation) {
   NumericVector Entropy(n);
   for (int i = 0; i<n; i++) {
     for (int k = 0; k<K; k++) {
-      Entropy(i) = Entropy(i) + probAllocation(i, k)*log(probAllocation(i, k));
+      if (probAllocation(i, k) == 0) {
+        Entropy(i) = -1.0/n;
+      } else {
+        Entropy(i) = Entropy(i) + probAllocation(i, k)*log2(probAllocation(i, k));
+      }
     }
     Entropy(i) = -Entropy(i);
   }
-  // STEP 3. Normalize the entropy
-  double sommaEntropia = sum(Entropy);
-  // check the entropy values
+  double sumEnt = sum(Entropy);
+  // normalize the diversity measure
   for (int i = 0; i<n; i++) {
-    Entropy(i) = Entropy(i) / sommaEntropia;
+    Entropy(i) = Entropy(i) / sumEnt;
   } 
-  // cout << "Somma Entropia: " << sum(Entropy) << "\n";
   return(Entropy);
 }
 
@@ -1072,7 +1146,7 @@ arma::irowvec diversity_allocation(NumericMatrix probAllocation, int m, arma::ir
 
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, String diversity, arma::irowvec trueAllocation) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, double q) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -1102,6 +1176,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   List PREC(nout);
   // ARI Index
   arma::vec LOSS(nout);
+  // Adaptive Gamma
+  arma::vec GAMMA(nout);
   // Alpha weight
   NumericVector alpha(n); // start from 1/n
   // for (int i = 0; i<n; i++) {
@@ -1130,10 +1206,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     } 
     hyper_prec_a = hyper(4);
   } 
-  
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
+  NumericVector constVal(n);
+  for (int i = 0; i<n; i++) {
+    constVal(i) = 1.0/n;
+  }
   // Z
   arma::irowvec z(n);
   NumericVector probC(K);
@@ -1185,14 +1264,12 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   for (int t = 0; t<iteration; t++) {
     // update probability
     probAllocation = comp_ProbAlloc(pi, mu, prec, X);
-    if (diversity == "Entropy") {
-      // compute entropy
-      Diversity = entropy(probAllocation); 
-    } else if (diversity == "Gini-Simpson") {
-      Diversity = GSIndex(probAllocation);
-    } else {
-      cout << "You need to specify a Diversity Index!" << "\n";
+    Diversity = generalizedBG(probAllocation, q);
+    if (adaptiveGamma == true) {
+      // gamma = update_gammaEntropy(n, m, d, sumDiversity);
+      gamma = 1-pow(JS_distance(Diversity, constVal), (1.0/q));
     }
+    // cout << "gamma: " << gamma << "\n";
     // update alpha
     alpha = update_alpha(t, gamma, alpha, Diversity);
     // update z
@@ -1221,6 +1298,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
         LOSS(idx) = Loss;
         // cout << "Matrice di Contingenza: \n" << contMat(z, trueAllocation) << "\n";
       }
+      if (adaptiveGamma == true) {
+        GAMMA(idx) = gamma;
+      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -1231,22 +1311,45 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   if (sum(trueAllocation) != 0) {
-    return List::create(Named("Allocation") = Z,
-                        Named("Diversity") = D,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Mu") = MU,
-                        Named("Precision") = PREC,
-                        Named("Loss") = LOSS,
-                        Named("Alpha") = ALPHA,
-                        Named("Execution_Time") = duration/1000000);
+    if (adaptiveGamma == true) {
+      return List::create(Named("Allocation") = Z,
+                          Named("Diversity") = D,
+                          Named("Proportion_Parameters") = PI,
+                          Named("Mu") = MU,
+                          Named("Precision") = PREC,
+                          Named("Loss") = LOSS,
+                          Named("Alpha") = ALPHA,
+                          Named("Gamma") = GAMMA,
+                          Named("Execution_Time") = duration/1000000);
+    } else {
+      return List::create(Named("Allocation") = Z,
+                          Named("Diversity") = D,
+                          Named("Proportion_Parameters") = PI,
+                          Named("Mu") = MU,
+                          Named("Precision") = PREC,
+                          Named("Loss") = LOSS,
+                          Named("Alpha") = ALPHA,
+                          Named("Execution_Time") = duration/1000000);
+    }
   } else {
-    return List::create(Named("Allocation") = Z,
-                        Named("Diversity") = D,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Mu") = MU,
-                        Named("Precision") = PREC,
-                        Named("Alpha") = ALPHA,
-                        Named("Execution_Time") = duration/1000000);
+    if (adaptiveGamma == true) {
+      return List::create(Named("Allocation") = Z,
+                          Named("Diversity") = D,
+                          Named("Proportion_Parameters") = PI,
+                          Named("Mu") = MU,
+                          Named("Precision") = PREC,
+                          Named("Alpha") = ALPHA,
+                          Named("Gamma") = GAMMA,
+                          Named("Execution_Time") = duration/1000000);
+    } else {
+      return List::create(Named("Allocation") = Z,
+                          Named("Diversity") = D,
+                          Named("Proportion_Parameters") = PI,
+                          Named("Mu") = MU,
+                          Named("Precision") = PREC,
+                          Named("Alpha") = ALPHA,
+                          Named("Execution_Time") = duration/1000000);
+    }
   }
   
 }
