@@ -6,16 +6,16 @@
 \usage{
 DiversityGibbs(
   X,
-  hyper = c(1, 1, 0, 0.1, 1, 1),
+  hyper = c(1, 1, 0, 1, 1, 1),
   K = 3,
   m = 10,
   iteration = 1000,
   burnin = 50,
   thin = 5,
-  method = "EB",
+  method = "",
   gamma = 0.5,
   trueAllocation = numeric(0),
-  adaptiveGamma = TRUE,
+  adaptiveGamma = FALSE,
   q = 1
 )
 }

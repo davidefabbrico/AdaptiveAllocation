@@ -6,13 +6,13 @@
 \usage{
 rssg(
   X,
-  hyper = c(1, 1, 0, 0.1, 1, 1),
+  hyper = c(1, 1, 0, 1, 1, 1),
   K = 3,
   m = 10,
   iteration = 1000,
   burnin = 50,
   thin = 5,
-  method = "EB",
+  method = "",
   trueAllocation = numeric(0)
 )
 }
