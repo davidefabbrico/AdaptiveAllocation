@@ -27,8 +27,9 @@ using namespace std;
 // [X] How to summarize the posterior? (in C++)
 // [ ] Code Optimization
 // [X] Check the full conditional with the new Regularization
-// [ ] Evaluate Convergence
+// [X] Evaluate Convergence
 // [ ] How many time I need to update the Prob Allocation Matrix?
+// [~] Categorical Data
 
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
@@ -78,6 +79,24 @@ int diracF(int a, int b){
   } else {
     return 0;
   }
+}
+
+// [[Rcpp::export]]
+arma::mat summary_Posterior(arma::imat z) {
+  int N = z.n_cols;
+  int M = z.n_rows;
+  arma::mat sumPost = arma::zeros<arma::mat>(N, N);
+  for (int i = 0; i<N; i++) {
+    for (int j = 0; j<N; j++) {
+      for (int m = 0; m<M; m++) {
+        sumPost(i, j) = sumPost(i, j) + diracF(z(m, i), z(m, j));
+      }
+    }
+  }
+  sumPost = sumPost/M;
+  // cout << "Somma per riga " << sum(sumPost, 0) << "\n";
+  // cout << "Somma per colonna " << sum(sumPost, 1) << "\n";
+  return(sumPost);
 }
 
 // come campionare dalla distribuzione di Dirichlet
@@ -308,7 +327,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
       N[z[i]] = N[z[i]]+1;
     }
     // update pi
-    arma::rowvec parDirich = ((concPar.t())/K) + N;
+    arma::rowvec parDirich = concPar.t() + N;
     arma::vec parDirichR = parDirich.t();
     pi = rdirichlet_cpp(1, parDirichR);
     // update params
@@ -500,7 +519,6 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   NumericVector rI(m);
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
-  NumericVector Diversity(n);
   // alpha uniform weight 
   NumericVector alpha = constVal;
   // Loss index
@@ -537,7 +555,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
       N[z[i]] = N[z[i]]+1;
     }
     // update pi
-    arma::rowvec parDirich = ((concPar.t())/K) + N;
+    arma::rowvec parDirich = concPar.t() + N;
     arma::vec parDirichR = parDirich.t();
     pi = rdirichlet_cpp(1, parDirichR);
     // update params
@@ -820,7 +838,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
       N[z[i]] = N[z[i]]+1;
     }
     // update pi
-    arma::rowvec parDirich = ((concPar.t())/K) + N;
+    arma::rowvec parDirich = concPar.t() + N;
     arma::vec parDirichR = parDirich.t();
     pi = rdirichlet_cpp(1, parDirichR);
     // update params
@@ -934,28 +952,503 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
 }
 
 
-// [[Rcpp::export]]
-arma::mat summary_Posterior(arma::imat z) {
-  int N = z.n_cols;
-  int M = z.n_rows;
-  arma::mat sumPost = arma::zeros<arma::mat>(N, N);
-  for (int i = 0; i<N; i++) {
-    for (int j = 0; j<N; j++) {
-      for (int m = 0; m<M; m++) {
-        sumPost(i, j) = sumPost(i, j) + diracF(z(m, i), z(m, j));
-      }
-    }
-  }
-  sumPost = sumPost/M;
-  // cout << "Somma per riga " << sum(sumPost, 0) << "\n";
-  // cout << "Somma per colonna " << sum(sumPost, 1) << "\n";
-  return(sumPost);
-}
-
-
-
 
 ////////////////////////////////////////////////////
 /////////////// Categorical Data //////////////////
 ///////////////////////////////////////////////////
 
+// [[Rcpp::export]]
+List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin, int thin, arma::irowvec trueAllocation) {
+  // start time
+  // We suppose that R1 = R2 = ... = Rd
+  auto start = std::chrono::high_resolution_clock::now();
+  ////////////////////////////////////////////////////
+  ////////////////// Initial settings ///////////////
+  ///////////////////////////////////////////////////
+  int nout = (iteration-burnin)/thin; // number of sample from the posterior
+  int n = X.n_rows; // number of rows
+  int d = X.n_cols; // number of columns
+  int idx = 0;
+  // Index for the cluster
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
+  // Index for the category
+  NumericVector indCat(R);
+  for (int r = 0; r<R; r++) {
+    indCat(r) = r;
+  } 
+  // Z
+  arma::imat Z(nout, n);
+  // PI
+  arma::mat PI(nout, K);
+  // Probability for each category
+  List PROBCAT(nout);
+  // ARI Index
+  arma::vec LOSS(nout);
+  ////////////////////////////////////////////////////
+  ////////////////// Initial value //////////////////
+  ///////////////////////////////////////////////////
+  // Z
+  arma::irowvec z(n);
+  NumericVector probC(K);
+  for (int k = 0; k<K; k++) {
+    probC(k) = hyper(0)/K;
+  }  
+  for (int i = 0; i<n; i++) {
+    z(i) = csample_num(indC, 1, true, probC)(0);
+  }  
+  // PI
+  arma::rowvec pi(K);
+  arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
+  pi = rdirichlet_cpp(1, concPar);
+  // PROBABILITY FOR EACH CATEGORY - Dimension JxKxR (dimension x cluster x category)
+  arma::cube probCat(K, R, d);
+  arma::vec initR = (hyper(2)/R) * arma::ones<arma::vec>(R);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      probCat.slice(j).row(k) = rdirichlet_cpp(1, initR);
+    }
+  } 
+  // Probability Matrix
+  NumericMatrix probAllocation(n, K);
+  // Loss index
+  double Loss = 0;
+  ////////////////////////////////////////////////////
+  /////////////////// Main Part /////////////////////
+  ///////////////////////////////////////////////////
+  for (int t = 0; t<iteration; t++) {
+    // update probability
+    // STEP 1. Compute the probability
+    for (int i = 0; i<n; i++) {
+      for (int k = 0; k<K; k++) {
+        arma::vec vecTmp(d);
+        for (int j = 0; j<d; j++) {
+          vecTmp(j) = probCat.slice(j)(k, X(i,j));
+        } 
+        probAllocation(i,k) = pi(k)*myProduct(vecTmp);
+      }  
+    }
+    // Normalize the rows
+    arma::vec rSum = rowSums(probAllocation);
+    for (int i = 0; i<n; i++) {
+      probAllocation(i, _) = probAllocation(i, _) / rSum(i);
+    } 
+    // update z
+    for (int i = 0; i<n; i++) {
+      z(i) = csample_num(indC, 1, false, probAllocation(i, _))(0);
+    } 
+    // compute Nr
+    arma::irowvec Nr(R);
+    for (int i = 0; i<n; i++) {
+      for (int j = 0; j<d; j++) {
+        Nr(X(i,j)) = Nr(X(i,j)) + 1;
+      }
+    } 
+    // compute N
+    arma::irowvec N(K);
+    for (int i = 0; i < n; i++) {
+      N[z[i]] = N[z[i]]+1;
+    } 
+    // update pi
+    arma::rowvec parDirich = concPar.t() + N;
+    arma::vec parDirichR = parDirich.t();
+    pi = rdirichlet_cpp(1, parDirichR);
+    // update category probability
+    arma::rowvec parDirichCat = initR.t() + Nr;
+    arma::vec parDirichRCat = parDirichCat.t();
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        probCat.slice(j).row(k) = rdirichlet_cpp(1, parDirichRCat);
+      }
+    } 
+    ////////////////////////////////////////////////////
+    ///////////////// Store Results ///////////////////
+    ///////////////////////////////////////////////////
+    if(t%thin == 0 && t > burnin-1) {
+      Z.row(idx) = z;
+      PI.row(idx) = pi;
+      PROBCAT[idx] = probCat;
+      if (sum(trueAllocation) != 0) {
+        Loss = ari(z, trueAllocation);
+        // Loss = BinderLoss(z, trueAllocation);
+        LOSS(idx) = Loss;
+      } 
+      idx = idx + 1;
+    } 
+    if (t%1000 == 0 && t > 0) {
+      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    }
+  } 
+  std::cout << "End MCMC!\n";
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  if (sum(trueAllocation) != 0) {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Category Probability") = PROBCAT,
+                        Named("Loss") = LOSS,
+                        Named("Execution_Time") = duration/1000000);
+  } else { 
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Category Probability") = PROBCAT,
+                        Named("Execution_Time") = duration/1000000);
+  } 
+}
+
+
+
+// [[Rcpp::export]]
+List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, arma::irowvec trueAllocation) {
+  // start time
+  // We suppose that R1 = R2 = ... = Rd
+  auto start = std::chrono::high_resolution_clock::now();
+  ////////////////////////////////////////////////////
+  ////////////////// Initial settings ///////////////
+  ///////////////////////////////////////////////////
+  int nout = (iteration-burnin)/thin; // number of sample from the posterior
+  int n = X.n_rows; // number of rows
+  int d = X.n_cols; // number of columns
+  int idx = 0;
+  // Index for the cluster
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
+  // Index for the category
+  NumericVector indCat(R);
+  for (int r = 0; r<R; r++) {
+    indCat(r) = r;
+  }
+  NumericVector indI(n); // index for the observation
+  for (int i = 0; i<n; i++) {
+    indI(i) = i;
+  }
+  // uniform weight vector
+  NumericVector constVal(n);
+  for (int i = 0; i<n; i++) {
+    constVal(i) = 1.0/n;
+  } 
+  // Z
+  arma::imat Z(nout, n);
+  // PI
+  arma::mat PI(nout, K);
+  // Probability for each category
+  List PROBCAT(nout);
+  // ARI Index
+  arma::vec LOSS(nout);
+  ////////////////////////////////////////////////////
+  ////////////////// Initial value //////////////////
+  ///////////////////////////////////////////////////
+  // Z
+  arma::irowvec z(n);
+  NumericVector probC(K);
+  for (int k = 0; k<K; k++) {
+    probC(k) = hyper(0)/K;
+  }  
+  for (int i = 0; i<n; i++) {
+    z(i) = csample_num(indC, 1, true, probC)(0);
+  }  
+  // PI
+  arma::rowvec pi(K);
+  arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
+  pi = rdirichlet_cpp(1, concPar);
+  // PROBABILITY FOR EACH CATEGORY - Dimension JxKxR (dimension x cluster x category)
+  arma::cube probCat(K, R, d);
+  arma::vec initR = (hyper(2)/R) * arma::ones<arma::vec>(R);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      probCat.slice(j).row(k) = rdirichlet_cpp(1, initR);
+    }
+  }
+  // random sample
+  NumericVector rI(m);
+  // alpha weight
+  NumericVector alpha = constVal;
+  // Probability Matrix
+  NumericMatrix probAllocation(n, K);
+  // Loss index
+  double Loss = 0;
+  ////////////////////////////////////////////////////
+  /////////////////// Main Part /////////////////////
+  ///////////////////////////////////////////////////
+  for (int t = 0; t<iteration; t++) {
+    // sample according to alpha (uniform)
+    rI = csample_num(indI, m, false, alpha);
+    // update probability
+    // STEP 1. Compute the probability
+    for (int i = 0; i<m; i++) {
+      for (int k = 0; k<K; k++) {
+        arma::vec vecTmp(d);
+        for (int j = 0; j<d; j++) {
+          vecTmp(j) = probCat.slice(j)(k, X(rI(i),j));
+        }
+        probAllocation(rI(i),k) = pi(k)*myProduct(vecTmp);
+      } 
+    }
+    // Normalize the rows
+    arma::vec rSum = rowSums(probAllocation);
+    for (int i = 0; i<m; i++) {
+      probAllocation(rI(i), _) = probAllocation(rI(i), _) / rSum(rI(i));
+    }
+    // update z
+    for (int i = 0; i<m; i++) {
+      z(rI(i)) = csample_num(indC, 1, false, probAllocation(rI(i), _))(0);
+    }
+    // compute Nr
+    arma::irowvec Nr(R);
+    for (int i = 0; i<n; i++) {
+      for (int j = 0; j<d; j++) {
+        Nr(X(i,j)) = Nr(X(i,j)) + 1;
+      }
+    }
+    // compute N
+    arma::irowvec N(K);
+    for (int i = 0; i < n; i++) {
+      N[z[i]] = N[z[i]]+1;
+    }
+    // update pi
+    arma::rowvec parDirich = concPar.t() + N;
+    arma::vec parDirichR = parDirich.t();
+    pi = rdirichlet_cpp(1, parDirichR);
+    // update category probability
+    arma::rowvec parDirichCat = initR.t() + Nr;
+    arma::vec parDirichRCat = parDirichCat.t();
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        probCat.slice(j).row(k) = rdirichlet_cpp(1, parDirichRCat);
+      }
+    }
+    ////////////////////////////////////////////////////
+    ///////////////// Store Results ///////////////////
+    ///////////////////////////////////////////////////
+    if(t%thin == 0 && t > burnin-1) {
+      Z.row(idx) = z;
+      PI.row(idx) = pi;
+      PROBCAT[idx] = probCat;
+      if (sum(trueAllocation) != 0) {
+        Loss = ari(z, trueAllocation);
+        // Loss = BinderLoss(z, trueAllocation);
+        LOSS(idx) = Loss;
+      }
+      idx = idx + 1;
+    }
+    if (t%1000 == 0 && t > 0) {
+      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    }
+  }
+  std::cout << "End MCMC!\n";
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  if (sum(trueAllocation) != 0) {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Category Probability") = PROBCAT,
+                        Named("Loss") = LOSS,
+                        Named("Execution_Time") = duration/1000000);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Category Probability") = PROBCAT,
+                        Named("Execution_Time") = duration/1000000);
+  }
+}
+
+
+// [[Rcpp::export]]
+List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, int q) {
+  // start time
+  // We suppose that R1 = R2 = ... = Rd
+  auto start = std::chrono::high_resolution_clock::now();
+  ////////////////////////////////////////////////////
+  ////////////////// Initial settings ///////////////
+  ///////////////////////////////////////////////////
+  int nout = (iteration-burnin)/thin; // number of sample from the posterior
+  int n = X.n_rows; // number of rows
+  int d = X.n_cols; // number of columns
+  int idx = 0;
+  // Index for the cluster
+  NumericVector indC(K);
+  for (int k = 0; k<K; k++) {
+    indC(k) = k;
+  }
+  // Index for the category
+  NumericVector indCat(R);
+  for (int r = 0; r<R; r++) {
+    indCat(r) = r;
+  } 
+  NumericVector indI(n); // index for the observation
+  for (int i = 0; i<n; i++) {
+    indI(i) = i;
+  } 
+  // uniform weight vector
+  NumericVector constVal(n);
+  for (int i = 0; i<n; i++) {
+    constVal(i) = 1.0/n;
+  } 
+  // Z
+  arma::imat Z(nout, n);
+  // PI
+  arma::mat PI(nout, K);
+  // Probability for each category
+  List PROBCAT(nout);
+  // Diversity
+  NumericMatrix D(nout, n);
+  // ARI Index
+  arma::vec LOSS(nout);
+  if (q < 0) {
+    cout << "q should be greater or equal to 0!" << "\n";
+  }
+  ////////////////////////////////////////////////////
+  ////////////////// Initial value //////////////////
+  ///////////////////////////////////////////////////
+  // Z
+  arma::irowvec z(n);
+  NumericVector probC(K);
+  for (int k = 0; k<K; k++) {
+    probC(k) = hyper(0)/K;
+  }  
+  for (int i = 0; i<n; i++) {
+    z(i) = csample_num(indC, 1, true, probC)(0);
+  }  
+  // PI
+  arma::rowvec pi(K);
+  arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
+  pi = rdirichlet_cpp(1, concPar);
+  // PROBABILITY FOR EACH CATEGORY - Dimension JxKxR (dimension x cluster x category)
+  arma::cube probCat(K, R, d);
+  arma::vec initR = (hyper(2)/R) * arma::ones<arma::vec>(R);
+  for (int j = 0; j<d; j++) {
+    for (int k = 0; k<K; k++) {
+      probCat.slice(j).row(k) = rdirichlet_cpp(1, initR);
+    }
+  }
+  // random sample
+  NumericVector rI(m);
+  // alpha weight
+  NumericVector alpha(n);
+  NumericVector alpha_prec = constVal;
+  // Probability Matrix
+  NumericMatrix probAllocation(n, K);
+  // Loss index
+  double Loss = 0;
+  ////////////////////////////////////////////////////
+  /////////////////// Main Part /////////////////////
+  ///////////////////////////////////////////////////
+  for (int t = 0; t<iteration; t++) {
+    // update probability
+    for (int i = 0; i<n; i++) {
+      for (int k = 0; k<K; k++) {
+        arma::vec vecTmp(d);
+        for (int j = 0; j<d; j++) {
+          // ATTENZIONE
+          vecTmp(j) = probCat.slice(j)(k, X(i,j));
+        } 
+        probAllocation(i,k) = pi(k)*myProduct(vecTmp);
+      }  
+    }
+    // Normalize the rows
+    arma::vec rSum = rowSums(probAllocation);
+    for (int i = 0; i<n; i++) {
+      probAllocation(i, _) = probAllocation(i, _) / rSum(i);
+    }
+    NumericVector Diversity(n);
+    if (q == 1) {
+      for (int i = 0; i<n; i++) {
+        for (int k = 0; k<K; k++) {
+          Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k));
+        }
+        Diversity(i) = -Diversity(i);
+      }
+    } else { 
+      for (int i = 0; i<n; i++) {
+        for (int k = 0; k<K; k++) {
+          Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
+        } 
+        Diversity(i) = (1-Diversity(i))/(q-1);
+      } 
+    }
+    // Normalize
+    double sumDiv = sum(Diversity);
+    for (int i = 0; i<n; i++) {
+      Diversity(i) = (Diversity(i) / sumDiv);
+    }  
+    if (adaptiveGamma == true) {
+      gamma = 1-pow(JS_distance(Diversity, constVal), (1.0/q));
+    } 
+    // update alpha
+    if (t == 0 || t == 1) {
+      alpha = gamma*Diversity+(1-gamma)*constVal;
+    } else { 
+      alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+    } 
+    // sample according to alpha
+    rI = csample_num(indI, m, false, alpha);
+    // update z
+    for (int i = 0; i<m; i++) {
+      z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
+    } 
+    // compute Nr
+    arma::irowvec Nr(R);
+    for (int i = 0; i<n; i++) {
+      for (int j = 0; j<d; j++) {
+        Nr(X(i,j)) = Nr(X(i,j)) + 1;
+      }
+    } 
+    // compute N
+    arma::irowvec N(K);
+    for (int i = 0; i < n; i++) {
+      N[z[i]] = N[z[i]]+1;
+    } 
+    // update pi
+    arma::rowvec parDirich = concPar.t() + N;
+    arma::vec parDirichR = parDirich.t();
+    pi = rdirichlet_cpp(1, parDirichR);
+    // update category probability
+    arma::rowvec parDirichCat = initR.t() + Nr;
+    arma::vec parDirichRCat = parDirichCat.t();
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        probCat.slice(j).row(k) = rdirichlet_cpp(1, parDirichRCat);
+      }
+    }
+    alpha_prec = alpha;
+    ////////////////////////////////////////////////////
+    ///////////////// Store Results ///////////////////
+    ///////////////////////////////////////////////////
+    if(t%thin == 0 && t > burnin-1) {
+      Z.row(idx) = z;
+      PI.row(idx) = pi;
+      D.row(idx) = Diversity;
+      PROBCAT[idx] = probCat;
+      if (sum(trueAllocation) != 0) {
+        Loss = ari(z, trueAllocation);
+        // Loss = BinderLoss(z, trueAllocation);
+        LOSS(idx) = Loss;
+      } 
+      idx = idx + 1;
+    } 
+    if (t%1000 == 0 && t > 0) {
+      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    } 
+  }
+  std::cout << "End MCMC!\n";
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  if (sum(trueAllocation) != 0) {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Category Probability") = PROBCAT,
+                        Named("Diversity") = D, 
+                        Named("Loss") = LOSS,
+                        Named("Execution_Time") = duration/1000000);
+  } else { 
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Category Probability") = PROBCAT,
+                        Named("Diversity") = D, 
+                        Named("Execution_Time") = duration/1000000);
+  } 
+}

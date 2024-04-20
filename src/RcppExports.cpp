@@ -61,6 +61,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// summary_Posterior
+arma::mat summary_Posterior(arma::imat z);
+RcppExport SEXP _AdaptiveAllocation_summary_Posterior(SEXP zSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::imat >::type z(zSEXP);
+    rcpp_result_gen = Rcpp::wrap(summary_Posterior(z));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rdirichlet_cpp
 arma::mat rdirichlet_cpp(int num_samples, arma::vec alpha_m);
 RcppExport SEXP _AdaptiveAllocation_rdirichlet_cpp(SEXP num_samplesSEXP, SEXP alpha_mSEXP) {
@@ -191,14 +202,62 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// summary_Posterior
-arma::mat summary_Posterior(arma::imat z);
-RcppExport SEXP _AdaptiveAllocation_summary_Posterior(SEXP zSEXP) {
+// CSSG
+List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin, int thin, arma::irowvec trueAllocation);
+RcppExport SEXP _AdaptiveAllocation_CSSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP RSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP trueAllocationSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::imat >::type z(zSEXP);
-    rcpp_result_gen = Rcpp::wrap(summary_Posterior(z));
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper(hyperSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    Rcpp::traits::input_parameter< int >::type R(RSEXP);
+    Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type trueAllocation(trueAllocationSEXP);
+    rcpp_result_gen = Rcpp::wrap(CSSG(X, hyper, K, R, iteration, burnin, thin, trueAllocation));
+    return rcpp_result_gen;
+END_RCPP
+}
+// CRSG
+List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, arma::irowvec trueAllocation);
+RcppExport SEXP _AdaptiveAllocation_CRSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP RSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP trueAllocationSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper(hyperSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    Rcpp::traits::input_parameter< int >::type R(RSEXP);
+    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type trueAllocation(trueAllocationSEXP);
+    rcpp_result_gen = Rcpp::wrap(CRSG(X, hyper, K, R, m, iteration, burnin, thin, trueAllocation));
+    return rcpp_result_gen;
+END_RCPP
+}
+// CDSG
+List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, int q);
+RcppExport SEXP _AdaptiveAllocation_CDSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP RSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP gammaSEXP, SEXP trueAllocationSEXP, SEXP adaptiveGammaSEXP, SEXP qSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper(hyperSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    Rcpp::traits::input_parameter< int >::type R(RSEXP);
+    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    Rcpp::traits::input_parameter< arma::irowvec >::type trueAllocation(trueAllocationSEXP);
+    Rcpp::traits::input_parameter< bool >::type adaptiveGamma(adaptiveGammaSEXP);
+    Rcpp::traits::input_parameter< int >::type q(qSEXP);
+    rcpp_result_gen = Rcpp::wrap(CDSG(X, hyper, K, R, m, iteration, burnin, thin, gamma, trueAllocation, adaptiveGamma, q));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -208,6 +267,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_callrgamma", (DL_FUNC) &_AdaptiveAllocation_callrgamma, 3},
     {"_AdaptiveAllocation_csample_num", (DL_FUNC) &_AdaptiveAllocation_csample_num, 4},
     {"_AdaptiveAllocation_diracF", (DL_FUNC) &_AdaptiveAllocation_diracF, 2},
+    {"_AdaptiveAllocation_summary_Posterior", (DL_FUNC) &_AdaptiveAllocation_summary_Posterior, 1},
     {"_AdaptiveAllocation_rdirichlet_cpp", (DL_FUNC) &_AdaptiveAllocation_rdirichlet_cpp, 2},
     {"_AdaptiveAllocation_BinderLoss", (DL_FUNC) &_AdaptiveAllocation_BinderLoss, 2},
     {"_AdaptiveAllocation_coefBinom", (DL_FUNC) &_AdaptiveAllocation_coefBinom, 2},
@@ -217,7 +277,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 9},
     {"_AdaptiveAllocation_JS_distance", (DL_FUNC) &_AdaptiveAllocation_JS_distance, 2},
     {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 12},
-    {"_AdaptiveAllocation_summary_Posterior", (DL_FUNC) &_AdaptiveAllocation_summary_Posterior, 1},
+    {"_AdaptiveAllocation_CSSG", (DL_FUNC) &_AdaptiveAllocation_CSSG, 8},
+    {"_AdaptiveAllocation_CRSG", (DL_FUNC) &_AdaptiveAllocation_CRSG, 9},
+    {"_AdaptiveAllocation_CDSG", (DL_FUNC) &_AdaptiveAllocation_CDSG, 12},
     {NULL, NULL, 0}
 };
 

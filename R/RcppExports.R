@@ -17,6 +17,10 @@ diracF <- function(a, b) {
     .Call(`_AdaptiveAllocation_diracF`, a, b)
 }
 
+summary_Posterior <- function(z) {
+    .Call(`_AdaptiveAllocation_summary_Posterior`, z)
+}
+
 rdirichlet_cpp <- function(num_samples, alpha_m) {
     .Call(`_AdaptiveAllocation_rdirichlet_cpp`, num_samples, alpha_m)
 }
@@ -53,7 +57,15 @@ DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, 
     .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, trueAllocation, adaptiveGamma, q)
 }
 
-summary_Posterior <- function(z) {
-    .Call(`_AdaptiveAllocation_summary_Posterior`, z)
+CSSG <- function(X, hyper, K, R, iteration, burnin, thin, trueAllocation) {
+    .Call(`_AdaptiveAllocation_CSSG`, X, hyper, K, R, iteration, burnin, thin, trueAllocation)
+}
+
+CRSG <- function(X, hyper, K, R, m, iteration, burnin, thin, trueAllocation) {
+    .Call(`_AdaptiveAllocation_CRSG`, X, hyper, K, R, m, iteration, burnin, thin, trueAllocation)
+}
+
+CDSG <- function(X, hyper, K, R, m, iteration, burnin, thin, gamma, trueAllocation, adaptiveGamma, q) {
+    .Call(`_AdaptiveAllocation_CDSG`, X, hyper, K, R, m, iteration, burnin, thin, gamma, trueAllocation, adaptiveGamma, q)
 }
 
