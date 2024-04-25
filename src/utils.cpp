@@ -464,7 +464,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   if (method == "EB") {
     hyper_mu_mean = mean(X, 0);
     hyper_prec_a = d + 2;
-    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2/d));
+    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2.0/d));
   } else {
     cout << "Remember to specify the hyperparameter values!" << "\n";
     for (int j = 0; j<d; j++) {
@@ -663,7 +663,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, double q) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, double q) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -704,6 +704,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   arma::vec LOSS(nout);
   // Adaptive Gamma
   arma::vec GAMMA(nout);
+  // Adaptive M
+  arma::vec M(nout);
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -714,7 +716,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
   if (method == "EB") {
     hyper_mu_mean = mean(X, 0);
     hyper_prec_a = d + 2;
-    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2/d));
+    hyper_prec_b = sum(var(X, 0)/d)/(pow(K, 2.0/d));
   } else {
     cout << "Remember to specify the hyperparameter values!" << "\n";
     for (int j = 0; j<d; j++) {
@@ -816,9 +818,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
     double sumDiv = sum(Diversity);
     for (int i = 0; i<n; i++) {
       Diversity(i) = (Diversity(i) / sumDiv);
-    } 
+    }
+    // if (t <= 30) {
+    //   gamma = 0;
+    // }
     if (adaptiveGamma == true) {
-      gamma = 1-pow(JS_distance(Diversity, constVal), (1.0/q));
+      m = floor(n/(2*(1+pow(JS_distance(Diversity, constVal), (1.0/q)))));
+      gamma = 1-(m/n);// 1-pow(JS_distance(Diversity, constVal), (1.0/q));
     }
     // update alpha
     if (t == 0 || t == 1) {
@@ -897,6 +903,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
       }
       if (adaptiveGamma == true) {
         GAMMA(idx) = gamma;
+        M(idx) = m;
       }
       idx = idx + 1;
     }
@@ -917,6 +924,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
                           Named("Loss") = LOSS,
                           Named("Alpha") = ALPHA,
                           Named("Gamma") = GAMMA,
+                          Named("M") = M,
                           Named("Execution_Time") = duration/1000000);
     } else {
       return List::create(Named("Allocation") = Z,
@@ -937,6 +945,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, int m, int iteratio
                           Named("Precision") = PREC,
                           Named("Alpha") = ALPHA,
                           Named("Gamma") = GAMMA,
+                          Named("M") = M,
                           Named("Execution_Time") = duration/1000000);
     } else {
       return List::create(Named("Allocation") = Z,
@@ -974,11 +983,6 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   for (int k = 0; k<K; k++) {
     indC(k) = k;
   }
-  // Index for the category
-  NumericVector indCat(R);
-  for (int r = 0; r<R; r++) {
-    indCat(r) = r;
-  } 
   // Z
   arma::imat Z(nout, n);
   // PI
@@ -1004,15 +1008,16 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
   // PROBABILITY FOR EACH CATEGORY - Dimension JxKxR (dimension x cluster x category)
-  arma::cube probCat(K, R, d);
+  arma::cube probCat(R, d, K);
   arma::vec initR = (hyper(2)/R) * arma::ones<arma::vec>(R);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      probCat.slice(j).row(k) = rdirichlet_cpp(1, initR);
+      probCat.slice(k).col(j) = rdirichlet_cpp(1, initR).t();
     }
-  } 
+  }
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
+  arma::vec vecTmp(d);
   // Loss index
   double Loss = 0;
   ////////////////////////////////////////////////////
@@ -1021,46 +1026,42 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   for (int t = 0; t<iteration; t++) {
     // update probability
     // STEP 1. Compute the probability
-    for (int i = 0; i<n; i++) {
-      for (int k = 0; k<K; k++) {
-        arma::vec vecTmp(d);
+    for (int k = 0; k<K; k++) {
+      for (int i = 0; i<n; i++) {
         for (int j = 0; j<d; j++) {
-          vecTmp(j) = probCat.slice(j)(k, X(i,j));
+          vecTmp(j) = probCat.slice(k)(X(i,j), j);
         } 
         probAllocation(i,k) = pi(k)*myProduct(vecTmp);
       }  
     }
-    // Normalize the rows
-    arma::vec rSum = rowSums(probAllocation);
-    for (int i = 0; i<n; i++) {
-      probAllocation(i, _) = probAllocation(i, _) / rSum(i);
-    } 
-    // update z
+    // update z - DONE
     for (int i = 0; i<n; i++) {
       z(i) = csample_num(indC, 1, false, probAllocation(i, _))(0);
     } 
-    // compute Nr
-    arma::irowvec Nr(R);
-    for (int i = 0; i<n; i++) {
-      for (int j = 0; j<d; j++) {
-        Nr(X(i,j)) = Nr(X(i,j)) + 1;
-      }
-    } 
-    // compute N
+    // compute N - DONE
     arma::irowvec N(K);
     for (int i = 0; i < n; i++) {
-      N[z[i]] = N[z[i]]+1;
-    } 
-    // update pi
+      N[z[i]] = N[z[i]] + 1;
+    }
+    // compute Nr - DONE
+    arma::cube Nr(R, d, K);
+    for (int k = 0; k<K; k++) {
+      for (int i = 0; i<n; i++) {
+        if (z(i) == k) {
+          for (int j = 0; j<d; j++) {
+            Nr.slice(k)(X(i,j), j) = Nr.slice(k)(X(i,j), j) + 1;
+          } 
+        }
+      }
+    }
+    // update pi - DONE
     arma::rowvec parDirich = concPar.t() + N;
-    arma::vec parDirichR = parDirich.t();
-    pi = rdirichlet_cpp(1, parDirichR);
-    // update category probability
-    arma::rowvec parDirichCat = initR.t() + Nr;
-    arma::vec parDirichRCat = parDirichCat.t();
+    pi = rdirichlet_cpp(1, parDirich.t());
+    // update category probability - DONE
     for (int j = 0; j<d; j++) {
       for (int k = 0; k<K; k++) {
-        probCat.slice(j).row(k) = rdirichlet_cpp(1, parDirichRCat);
+        arma::rowvec parDirichCat = (initR + Nr.slice(k).col(j)).t();
+        probCat.slice(k).col(j) = rdirichlet_cpp(1, parDirichCat.t()).t();
       }
     } 
     ////////////////////////////////////////////////////
@@ -1087,13 +1088,13 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   if (sum(trueAllocation) != 0) {
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
-                        Named("Category Probability") = PROBCAT,
+                        Named("Category_Probability") = PROBCAT,
                         Named("Loss") = LOSS,
                         Named("Execution_Time") = duration/1000000);
   } else { 
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
-                        Named("Category Probability") = PROBCAT,
+                        Named("Category_Probability") = PROBCAT,
                         Named("Execution_Time") = duration/1000000);
   } 
 }
@@ -1116,11 +1117,6 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   NumericVector indC(K);
   for (int k = 0; k<K; k++) {
     indC(k) = k;
-  }
-  // Index for the category
-  NumericVector indCat(R);
-  for (int r = 0; r<R; r++) {
-    indCat(r) = r;
   }
   NumericVector indI(n); // index for the observation
   for (int i = 0; i<n; i++) {
@@ -1155,12 +1151,12 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   arma::rowvec pi(K);
   arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
-  // PROBABILITY FOR EACH CATEGORY - Dimension JxKxR (dimension x cluster x category)
-  arma::cube probCat(K, R, d);
+  // PROBABILITY FOR EACH CATEGORY
+  arma::cube probCat(R, d, K); 
   arma::vec initR = (hyper(2)/R) * arma::ones<arma::vec>(R);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      probCat.slice(j).row(k) = rdirichlet_cpp(1, initR);
+      probCat.slice(k).col(j) = rdirichlet_cpp(1, initR).t();
     }
   }
   // random sample
@@ -1171,6 +1167,7 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   NumericMatrix probAllocation(n, K);
   // Loss index
   double Loss = 0;
+  arma::vec vecTmp(d);
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -1181,9 +1178,8 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     // STEP 1. Compute the probability
     for (int i = 0; i<m; i++) {
       for (int k = 0; k<K; k++) {
-        arma::vec vecTmp(d);
         for (int j = 0; j<d; j++) {
-          vecTmp(j) = probCat.slice(j)(k, X(rI(i),j));
+          vecTmp(j) = probCat.slice(k)(X(rI(i),j), j);
         }
         probAllocation(rI(i),k) = pi(k)*myProduct(vecTmp);
       } 
@@ -1197,30 +1193,32 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     for (int i = 0; i<m; i++) {
       z(rI(i)) = csample_num(indC, 1, false, probAllocation(rI(i), _))(0);
     }
-    // compute Nr
-    arma::irowvec Nr(R);
-    for (int i = 0; i<n; i++) {
-      for (int j = 0; j<d; j++) {
-        Nr(X(i,j)) = Nr(X(i,j)) + 1;
-      }
-    }
     // compute N
     arma::irowvec N(K);
     for (int i = 0; i < n; i++) {
-      N[z[i]] = N[z[i]]+1;
+      N[z[i]] = N[z[i]] + 1;
+    }
+    // compute Nr
+    arma::cube Nr(R, d, K);
+    for (int k = 0; k<K; k++) {
+      for (int i = 0; i<n; i++) {
+        if (z(i) == k) {
+          for (int j = 0; j<d; j++) {
+            Nr.slice(k)(X(i,j), j) = Nr.slice(k)(X(i,j), j) + 1;
+          } 
+        }
+      }
     }
     // update pi
     arma::rowvec parDirich = concPar.t() + N;
-    arma::vec parDirichR = parDirich.t();
-    pi = rdirichlet_cpp(1, parDirichR);
+    pi = rdirichlet_cpp(1, parDirich.t());
     // update category probability
-    arma::rowvec parDirichCat = initR.t() + Nr;
-    arma::vec parDirichRCat = parDirichCat.t();
     for (int j = 0; j<d; j++) {
       for (int k = 0; k<K; k++) {
-        probCat.slice(j).row(k) = rdirichlet_cpp(1, parDirichRCat);
+        arma::rowvec parDirichCat = (initR + Nr.slice(k).col(j)).t();
+        probCat.slice(k).col(j) = rdirichlet_cpp(1, parDirichCat.t()).t();
       }
-    }
+    } 
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
@@ -1245,13 +1243,13 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   if (sum(trueAllocation) != 0) {
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
-                        Named("Category Probability") = PROBCAT,
+                        Named("Category_Probability") = PROBCAT,
                         Named("Loss") = LOSS,
                         Named("Execution_Time") = duration/1000000);
   } else {
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
-                        Named("Category Probability") = PROBCAT,
+                        Named("Category_Probability") = PROBCAT,
                         Named("Execution_Time") = duration/1000000);
   }
 }
@@ -1274,11 +1272,6 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   for (int k = 0; k<K; k++) {
     indC(k) = k;
   }
-  // Index for the category
-  NumericVector indCat(R);
-  for (int r = 0; r<R; r++) {
-    indCat(r) = r;
-  } 
   NumericVector indI(n); // index for the observation
   for (int i = 0; i<n; i++) {
     indI(i) = i;
@@ -1318,11 +1311,11 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
   pi = rdirichlet_cpp(1, concPar);
   // PROBABILITY FOR EACH CATEGORY - Dimension JxKxR (dimension x cluster x category)
-  arma::cube probCat(K, R, d);
+  arma::cube probCat(R, d, K);
   arma::vec initR = (hyper(2)/R) * arma::ones<arma::vec>(R);
   for (int j = 0; j<d; j++) {
     for (int k = 0; k<K; k++) {
-      probCat.slice(j).row(k) = rdirichlet_cpp(1, initR);
+      probCat.slice(k).col(j) = rdirichlet_cpp(1, initR).t();
     }
   }
   // random sample
@@ -1334,6 +1327,7 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   NumericMatrix probAllocation(n, K);
   // Loss index
   double Loss = 0;
+  arma::vec vecTmp(d);
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -1341,13 +1335,12 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     // update probability
     for (int i = 0; i<n; i++) {
       for (int k = 0; k<K; k++) {
-        arma::vec vecTmp(d);
         for (int j = 0; j<d; j++) {
           // ATTENZIONE
-          vecTmp(j) = probCat.slice(j)(k, X(i,j));
-        } 
+          vecTmp(j) = probCat.slice(k)(X(i,j), j);
+        }
         probAllocation(i,k) = pi(k)*myProduct(vecTmp);
-      }  
+      }
     }
     // Normalize the rows
     arma::vec rSum = rowSums(probAllocation);
@@ -1389,31 +1382,34 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
-    } 
-    // compute Nr
-    arma::irowvec Nr(R);
-    for (int i = 0; i<n; i++) {
-      for (int j = 0; j<d; j++) {
-        Nr(X(i,j)) = Nr(X(i,j)) + 1;
-      }
-    } 
+    }
     // compute N
     arma::irowvec N(K);
     for (int i = 0; i < n; i++) {
       N[z[i]] = N[z[i]]+1;
     } 
-    // update pi
-    arma::rowvec parDirich = concPar.t() + N;
-    arma::vec parDirichR = parDirich.t();
-    pi = rdirichlet_cpp(1, parDirichR);
-    // update category probability
-    arma::rowvec parDirichCat = initR.t() + Nr;
-    arma::vec parDirichRCat = parDirichCat.t();
-    for (int j = 0; j<d; j++) {
-      for (int k = 0; k<K; k++) {
-        probCat.slice(j).row(k) = rdirichlet_cpp(1, parDirichRCat);
+    // compute Nr
+    arma::cube Nr(R, d, K);
+    for (int k = 0; k<K; k++) {
+      for (int i = 0; i<n; i++) {
+        if (z(i) == k) {
+          for (int j = 0; j<d; j++) {
+            Nr.slice(k)(X(i,j), j) = Nr.slice(k)(X(i,j), j) + 1;
+          } 
+        }
       }
     }
+    // update pi
+    arma::rowvec parDirich = concPar.t() + N;
+    pi = rdirichlet_cpp(1, parDirich.t());
+    // update category probability
+    // update category probability
+    for (int j = 0; j<d; j++) {
+      for (int k = 0; k<K; k++) {
+        arma::rowvec parDirichCat = (initR + Nr.slice(k).col(j)).t();
+        probCat.slice(k).col(j) = rdirichlet_cpp(1, parDirichCat.t()).t();
+      }
+    } 
     alpha_prec = alpha;
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
@@ -1440,14 +1436,14 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   if (sum(trueAllocation) != 0) {
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
-                        Named("Category Probability") = PROBCAT,
+                        Named("Category_Probability") = PROBCAT,
                         Named("Diversity") = D, 
                         Named("Loss") = LOSS,
                         Named("Execution_Time") = duration/1000000);
   } else { 
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
-                        Named("Category Probability") = PROBCAT,
+                        Named("Category_Probability") = PROBCAT,
                         Named("Diversity") = D, 
                         Named("Execution_Time") = duration/1000000);
   } 
