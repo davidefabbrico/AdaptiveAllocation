@@ -10,7 +10,7 @@ status](https://img.shields.io/cran/v/invent)](https://CRAN.R-project.org/packag
 stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
 <!-- badges: end -->
 
-An R package for Adaptive Allocation in Finite Gaussian Mixture Model
+An R package for Adaptive Allocation in Finite Gaussian and Categorical Mixture Model
 
 The implementation has been done in C++ through the use of Rcpp and
 RcppArmadillo.
