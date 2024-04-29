@@ -25,11 +25,11 @@ using namespace std;
 // [X] Plot with entropy
 // Emphasise the color
 // [X] How to summarize the posterior? (in C++)
-// [ ] Code Optimization
+// [X] Categorical Data
 // [X] Check the full conditional with the new Regularization
 // [X] Evaluate Convergence
+// [ ] Code Optimization
 // [ ] How many time I need to update the Prob Allocation Matrix?
-// [~] Categorical Data
 
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
