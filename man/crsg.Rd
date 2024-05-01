@@ -12,8 +12,7 @@ crsg(
   m = 10,
   iteration = 1000,
   burnin = 50,
-  thin = 5,
-  trueAllocation = numeric(0)
+  thin = 5
 )
 }
 \description{

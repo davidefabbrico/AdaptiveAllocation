@@ -14,8 +14,7 @@ DiversityGibbs(
   thin = 5,
   method = "",
   gamma = 0.5,
-  trueAllocation = numeric(0),
-  adaptiveGamma = FALSE,
+  nRand = 10,
   q = 1
 )
 }

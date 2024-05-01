@@ -229,8 +229,6 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   List MU(nout);
   // SIGMA
   List PREC(nout);
-  // ARI Index
-  arma::vec LOSS(nout);
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -295,8 +293,6 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   }
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
-  // Loss index
-  double Loss = 0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -375,11 +371,6 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
       PI.row(idx) = pi;
       MU[idx] = mu;
       PREC[idx] = prec;
-      if (sum(trueAllocation) != 0) {
-        Loss = ari(z, trueAllocation);
-        // Loss = BinderLoss(z, trueAllocation);
-        LOSS(idx) = Loss;
-      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -389,20 +380,11 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  if (sum(trueAllocation) != 0) {
-    return List::create(Named("Allocation") = Z,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Mu") = MU,
-                        Named("Precision") = PREC,
-                        Named("Loss") = LOSS,
-                        Named("Execution_Time") = duration/1000000);
-  } else {
-    return List::create(Named("Allocation") = Z,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Mu") = MU,
-                        Named("Precision") = PREC,
-                        Named("Execution_Time") = duration/1000000);
-  }
+  return List::create(Named("Allocation") = Z,
+                      Named("Proportion_Parameters") = PI,
+                      Named("Mu") = MU,
+                      Named("Precision") = PREC,
+                      Named("Execution_Time") = duration/1000000);
 }
 
 
@@ -413,7 +395,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
 
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
-List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method, arma::irowvec trueAllocation) {
+List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -450,10 +432,6 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   List MU(nout);
   // SIGMA
   List PREC(nout);
-  // ARI Index
-  arma::vec LOSS(nout);
-  // Adaptive Gamma
-  arma::vec GAMMA(nout);
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -521,8 +499,6 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   NumericMatrix probAllocation(n, K);
   // alpha uniform weight 
   NumericVector alpha = constVal;
-  // Loss index
-  double Loss = 0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -603,11 +579,6 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
       PI.row(idx) = pi;
       MU[idx] = mu;
       PREC[idx] = prec;
-      if (sum(trueAllocation) != 0) {
-        Loss = ari(z, trueAllocation);
-        // Loss = BinderLoss(z, trueAllocation);
-        LOSS(idx) = Loss;
-      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -617,20 +588,11 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  if (sum(trueAllocation) != 0) {
-      return List::create(Named("Allocation") = Z,
-                          Named("Proportion_Parameters") = PI,
-                          Named("Mu") = MU,
-                          Named("Precision") = PREC,
-                          Named("Loss") = LOSS,
-                          Named("Execution_Time") = duration/1000000);
-  } else {
-      return List::create(Named("Allocation") = Z,
-                          Named("Proportion_Parameters") = PI,
-                          Named("Mu") = MU,
-                          Named("Precision") = PREC,
-                          Named("Execution_Time") = duration/1000000);
-  }
+  return List::create(Named("Allocation") = Z,
+                      Named("Proportion_Parameters") = PI,
+                      Named("Mu") = MU,
+                      Named("Precision") = PREC,
+                      Named("Execution_Time") = duration/1000000);
 }
 
 ////////////////////////////////////////////////////
@@ -663,7 +625,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, double q) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, int nRand, double q) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -700,12 +662,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   List MU(nout);
   // SIGMA
   List PREC(nout);
-  // ARI Index
-  arma::vec LOSS(nout);
-  // Adaptive Gamma
-  arma::vec GAMMA(nout);
-  // Adaptive M
-  arma::vec M(nout);
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -777,8 +733,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   // alpha weight 
   NumericVector alpha(n);
   NumericVector alpha_prec = constVal;
-  // Loss index
-  double Loss = 0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -823,19 +777,21 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     for (int i = 0; i<n; i++) {
       Diversity(i) = (Diversity(i) / sumDiv);
     }
-    // if (t <= 30) {
-    //   gamma = 0;
-    // }
-    if (adaptiveGamma == true) {
-      m = floor(n/(2*(1+pow(JS_distance(Diversity, constVal), (1.0/q)))));
-      gamma = 1-(m/n);// 1-pow(JS_distance(Diversity, constVal), (1.0/q));
-    }
     // update alpha
-    if (t == 0 || t == 1) {
-      alpha = gamma*Diversity+(1-gamma)*constVal;
+    if (t <= nRand) {
+      alpha = constVal;
     } else {
-      alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+      if (t == 0 || t == 1) {
+        alpha = gamma*Diversity+(1-gamma)*constVal;
+      } else {
+        alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+      }
     }
+    // if (t == 0 || t == 1) {
+    //   alpha = gamma*Diversity+(1-gamma)*constVal;
+    // } else {
+    //   alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+    // }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // update z
@@ -899,16 +855,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       D.row(idx) = Diversity;
       MU[idx] = mu;
       PREC[idx] = prec;
-      if (sum(trueAllocation) != 0) {
-        Loss = ari(z, trueAllocation);
-        // Loss = BinderLoss(z, trueAllocation);
-        LOSS(idx) = Loss;
-        // cout << "Matrice di Contingenza: \n" << contMat(z, trueAllocation) << "\n";
-      }
-      if (adaptiveGamma == true) {
-        GAMMA(idx) = gamma;
-        M(idx) = m;
-      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -918,49 +864,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  if (sum(trueAllocation) != 0) {
-    if (adaptiveGamma == true) {
-      return List::create(Named("Allocation") = Z,
-                          Named("Diversity") = D,
-                          Named("Proportion_Parameters") = PI,
-                          Named("Mu") = MU,
-                          Named("Precision") = PREC,
-                          Named("Loss") = LOSS,
-                          Named("Alpha") = ALPHA,
-                          Named("Gamma") = GAMMA,
-                          Named("M") = M,
-                          Named("Execution_Time") = duration/1000000);
-    } else {
-      return List::create(Named("Allocation") = Z,
-                          Named("Diversity") = D,
-                          Named("Proportion_Parameters") = PI,
-                          Named("Mu") = MU,
-                          Named("Precision") = PREC,
-                          Named("Loss") = LOSS,
-                          Named("Alpha") = ALPHA,
-                          Named("Execution_Time") = duration/1000000);
-    }
-  } else {
-    if (adaptiveGamma == true) {
-      return List::create(Named("Allocation") = Z,
-                          Named("Diversity") = D,
-                          Named("Proportion_Parameters") = PI,
-                          Named("Mu") = MU,
-                          Named("Precision") = PREC,
-                          Named("Alpha") = ALPHA,
-                          Named("Gamma") = GAMMA,
-                          Named("M") = M,
-                          Named("Execution_Time") = duration/1000000);
-    } else {
-      return List::create(Named("Allocation") = Z,
-                          Named("Diversity") = D,
-                          Named("Proportion_Parameters") = PI,
-                          Named("Mu") = MU,
-                          Named("Precision") = PREC,
-                          Named("Alpha") = ALPHA,
-                          Named("Execution_Time") = duration/1000000);
-    }
-  }
+  return List::create(Named("Allocation") = Z,
+                      Named("Diversity") = D,
+                      Named("Proportion_Parameters") = PI,
+                      Named("Mu") = MU,
+                      Named("Precision") = PREC,
+                      Named("Alpha") = ALPHA,
+                      Named("Execution_Time") = duration/1000000);
   
 }
 
@@ -971,7 +881,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
 ///////////////////////////////////////////////////
 
 // [[Rcpp::export]]
-List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin, int thin, arma::irowvec trueAllocation) {
+List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin, int thin) {
   // start time
   // We suppose that R1 = R2 = ... = Rd
   auto start = std::chrono::high_resolution_clock::now();
@@ -993,8 +903,6 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   arma::mat PI(nout, K);
   // Probability for each category
   List PROBCAT(nout);
-  // ARI Index
-  arma::vec LOSS(nout);
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -1022,8 +930,6 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
   arma::vec vecTmp(d);
-  // Loss index
-  double Loss = 0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -1075,11 +981,6 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
       Z.row(idx) = z;
       PI.row(idx) = pi;
       PROBCAT[idx] = probCat;
-      if (sum(trueAllocation) != 0) {
-        Loss = ari(z, trueAllocation);
-        // Loss = BinderLoss(z, trueAllocation);
-        LOSS(idx) = Loss;
-      } 
       idx = idx + 1;
     } 
     if (t%1000 == 0 && t > 0) {
@@ -1089,24 +990,16 @@ List CSSG(arma::mat X, arma::vec hyper, int K, int R, int iteration, int burnin,
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  if (sum(trueAllocation) != 0) {
-    return List::create(Named("Allocation") = Z,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Category_Probability") = PROBCAT,
-                        Named("Loss") = LOSS,
-                        Named("Execution_Time") = duration/1000000);
-  } else { 
-    return List::create(Named("Allocation") = Z,
+  return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
                         Named("Category_Probability") = PROBCAT,
                         Named("Execution_Time") = duration/1000000);
-  } 
 }
 
 
 
 // [[Rcpp::export]]
-List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, arma::irowvec trueAllocation) {
+List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin) {
   // start time
   // We suppose that R1 = R2 = ... = Rd
   auto start = std::chrono::high_resolution_clock::now();
@@ -1137,8 +1030,6 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   arma::mat PI(nout, K);
   // Probability for each category
   List PROBCAT(nout);
-  // ARI Index
-  arma::vec LOSS(nout);
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -1169,8 +1060,6 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   NumericVector alpha = constVal;
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
-  // Loss index
-  double Loss = 0;
   arma::vec vecTmp(d);
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
@@ -1230,11 +1119,6 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
       Z.row(idx) = z;
       PI.row(idx) = pi;
       PROBCAT[idx] = probCat;
-      if (sum(trueAllocation) != 0) {
-        Loss = ari(z, trueAllocation);
-        // Loss = BinderLoss(z, trueAllocation);
-        LOSS(idx) = Loss;
-      }
       idx = idx + 1;
     }
     if (t%1000 == 0 && t > 0) {
@@ -1244,23 +1128,15 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  if (sum(trueAllocation) != 0) {
-    return List::create(Named("Allocation") = Z,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Category_Probability") = PROBCAT,
-                        Named("Loss") = LOSS,
-                        Named("Execution_Time") = duration/1000000);
-  } else {
-    return List::create(Named("Allocation") = Z,
+  return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
                         Named("Category_Probability") = PROBCAT,
                         Named("Execution_Time") = duration/1000000);
-  }
 }
 
 
 // [[Rcpp::export]]
-List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, arma::irowvec trueAllocation, bool adaptiveGamma, int q) {
+List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, int nRand, int q) {
   // start time
   // We suppose that R1 = R2 = ... = Rd
   auto start = std::chrono::high_resolution_clock::now();
@@ -1293,8 +1169,6 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   List PROBCAT(nout);
   // Diversity
   NumericMatrix D(nout, n);
-  // ARI Index
-  arma::vec LOSS(nout);
   if (q < 0) {
     cout << "q should be greater or equal to 0!" << "\n";
   }
@@ -1329,8 +1203,6 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   NumericVector alpha_prec = constVal;
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
-  // Loss index
-  double Loss = 0;
   arma::vec vecTmp(d);
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
@@ -1362,7 +1234,11 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     } else { 
       for (int i = 0; i<n; i++) {
         for (int k = 0; k<K; k++) {
-          Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
+          if (probAllocation(i, k) == 0) {
+            Diversity(i) = Diversity(i) + 0;
+          } else {
+            Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
+          }
         } 
         Diversity(i) = (1-Diversity(i))/(q-1);
       } 
@@ -1371,16 +1247,17 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     double sumDiv = sum(Diversity);
     for (int i = 0; i<n; i++) {
       Diversity(i) = (Diversity(i) / sumDiv);
-    }  
-    if (adaptiveGamma == true) {
-      gamma = 1-pow(JS_distance(Diversity, constVal), (1.0/q));
     } 
     // update alpha
-    if (t == 0 || t == 1) {
-      alpha = gamma*Diversity+(1-gamma)*constVal;
-    } else { 
-      alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
-    } 
+    if (t <= nRand) {
+      alpha = constVal;
+    } else {
+      if (t == 0 || t == 1) {
+        alpha = gamma*Diversity+(1-gamma)*constVal;
+      } else { 
+        alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+      } 
+    }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // update z
@@ -1423,11 +1300,6 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
       PI.row(idx) = pi;
       D.row(idx) = Diversity;
       PROBCAT[idx] = probCat;
-      if (sum(trueAllocation) != 0) {
-        Loss = ari(z, trueAllocation);
-        // Loss = BinderLoss(z, trueAllocation);
-        LOSS(idx) = Loss;
-      } 
       idx = idx + 1;
     } 
     if (t%1000 == 0 && t > 0) {
@@ -1437,18 +1309,9 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   std::cout << "End MCMC!\n";
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  if (sum(trueAllocation) != 0) {
-    return List::create(Named("Allocation") = Z,
-                        Named("Proportion_Parameters") = PI,
-                        Named("Category_Probability") = PROBCAT,
-                        Named("Diversity") = D, 
-                        Named("Loss") = LOSS,
-                        Named("Execution_Time") = duration/1000000);
-  } else { 
-    return List::create(Named("Allocation") = Z,
+  return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
                         Named("Category_Probability") = PROBCAT,
                         Named("Diversity") = D, 
                         Named("Execution_Time") = duration/1000000);
-  } 
 }

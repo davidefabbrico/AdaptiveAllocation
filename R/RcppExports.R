@@ -45,27 +45,27 @@ SSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAllocation) {
     .Call(`_AdaptiveAllocation_SSG`, X, hyper, K, iteration, burnin, thin, method, trueAllocation)
 }
 
-RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method, trueAllocation) {
-    .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method, trueAllocation)
+RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method) {
+    .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method)
 }
 
 JS_distance <- function(p, q) {
     .Call(`_AdaptiveAllocation_JS_distance`, p, q)
 }
 
-DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, trueAllocation, adaptiveGamma, q) {
-    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, trueAllocation, adaptiveGamma, q)
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, nRand, q) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, nRand, q)
 }
 
-CSSG <- function(X, hyper, K, R, iteration, burnin, thin, trueAllocation) {
-    .Call(`_AdaptiveAllocation_CSSG`, X, hyper, K, R, iteration, burnin, thin, trueAllocation)
+CSSG <- function(X, hyper, K, R, iteration, burnin, thin) {
+    .Call(`_AdaptiveAllocation_CSSG`, X, hyper, K, R, iteration, burnin, thin)
 }
 
-CRSG <- function(X, hyper, K, R, m, iteration, burnin, thin, trueAllocation) {
-    .Call(`_AdaptiveAllocation_CRSG`, X, hyper, K, R, m, iteration, burnin, thin, trueAllocation)
+CRSG <- function(X, hyper, K, R, m, iteration, burnin, thin) {
+    .Call(`_AdaptiveAllocation_CRSG`, X, hyper, K, R, m, iteration, burnin, thin)
 }
 
-CDSG <- function(X, hyper, K, R, m, iteration, burnin, thin, gamma, trueAllocation, adaptiveGamma, q) {
-    .Call(`_AdaptiveAllocation_CDSG`, X, hyper, K, R, m, iteration, burnin, thin, gamma, trueAllocation, adaptiveGamma, q)
+CDSG <- function(X, hyper, K, R, m, iteration, burnin, thin, gamma, nRand, q) {
+    .Call(`_AdaptiveAllocation_CDSG`, X, hyper, K, R, m, iteration, burnin, thin, gamma, nRand, q)
 }
 

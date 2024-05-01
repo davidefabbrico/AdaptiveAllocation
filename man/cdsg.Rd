@@ -14,8 +14,7 @@ cdsg(
   burnin = 50,
   thin = 5,
   gamma = 0.5,
-  trueAllocation = numeric(0),
-  adaptiveGamma = FALSE,
+  nRand = 10,
   q = 1
 )
 }

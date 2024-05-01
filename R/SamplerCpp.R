@@ -3,7 +3,7 @@
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5, method = "", trueAllocation = numeric(0)) {
+ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin = 50, thin = 5, method = "") {
   # Hyperparameters description:
   # 1 concPar Dirichlet
   # 2 categorical
@@ -13,8 +13,7 @@ ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin 
   # 6 b0 gamma
   # d-dimensional gaussian data
   res <- SSG(as.matrix(X), as.vector(hyper), as.integer(K),
-             as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method),
-             as.vector(trueAllocation))
+             as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method))
   return(res)
 }
 
@@ -23,10 +22,9 @@ ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin 
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-rssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "", trueAllocation = numeric(0)) {
+rssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "") {
   res <- RSSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
-              as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method),
-              as.vector(trueAllocation))
+              as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method))
   return(res)
 }
 
@@ -36,11 +34,10 @@ rssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-DiversityGibbs <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "", gamma = 0.5, trueAllocation = numeric(0), adaptiveGamma = FALSE, q = 1) {
+DiversityGibbs <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "", gamma = 0.5, nRand = 10, q = 1) {
   res <- DiversityGibbsSamp(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method),
-              as.double(gamma), as.vector(trueAllocation), as.logical(adaptiveGamma),
-              as.double(q))
+              as.double(gamma), as.integer(nRand), as.double(q))
   return(res)
 }
 
@@ -51,9 +48,9 @@ DiversityGibbs <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iterat
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-cssg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, iteration = 1000, burnin = 50, thin = 5, trueAllocation = numeric(0)) {
+cssg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, iteration = 1000, burnin = 50, thin = 5) {
   res <- CSSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(R),
-                            as.integer(iteration), as.integer(burnin), as.integer(thin), as.vector(trueAllocation))
+                            as.integer(iteration), as.integer(burnin), as.integer(thin))
   return(res)
 }
 
@@ -63,9 +60,9 @@ cssg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, iteration = 1000, burnin =
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-crsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, trueAllocation = numeric(0)) {
+crsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, burnin = 50, thin = 5) {
   res <- CRSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(R), as.integer(m),
-              as.integer(iteration), as.integer(burnin), as.integer(thin), as.vector(trueAllocation))
+              as.integer(iteration), as.integer(burnin), as.integer(thin))
   return(res)
 }
 
@@ -75,9 +72,9 @@ crsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, 
 #' @export
 
 ##### ------------------------------------------------------------------ ######
-cdsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, gamma = 0.5, trueAllocation = numeric(0), adaptiveGamma = FALSE, q = 1) {
+cdsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, gamma = 0.5, nRand = 10, q = 1) {
   res <- CDSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(R), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), as.double(gamma),
-              as.vector(trueAllocation), as.logical(adaptiveGamma), as.integer(q))
+              as.integer(nRand), as.integer(q))
   return(res)
 }

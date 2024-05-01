@@ -11,8 +11,7 @@ ssg(
   iteration = 1000,
   burnin = 50,
   thin = 5,
-  method = "",
-  trueAllocation = numeric(0)
+  method = ""
 )
 }
 \description{
