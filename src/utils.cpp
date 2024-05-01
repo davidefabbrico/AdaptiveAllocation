@@ -802,7 +802,11 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     if (q == 1) {
       for (int i = 0; i<n; i++) {
         for (int k = 0; k<K; k++) {
-          Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k));
+          if (probAllocation(i, k) == 0) {
+            Diversity(i) = Diversity(i) + 0; // define log(0) = 0 (by Paul's note)
+          } else {
+            Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k)); 
+          }
         }
         Diversity(i) = -Diversity(i);
       }
