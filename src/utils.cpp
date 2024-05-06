@@ -625,7 +625,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, int nRand, double q) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -805,11 +805,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       // alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*alpha_custom;
     }
     // sample according to alpha
-    if (t < nRand) {
-      rI = csample_num(indI, m, false, constVal);
-    } else {
-      rI = csample_num(indI, m, false, alpha);
-    }
+    rI = csample_num(indI, m, false, alpha);
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
@@ -1046,6 +1042,9 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   arma::mat PI(nout, K);
   // Probability for each category
   List PROBCAT(nout);
+  if (n < m) {
+    cout << "The number of observations should be greater or equal to the number of samples!" << "\n";
+  }
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -1152,7 +1151,7 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
 
 
 // [[Rcpp::export]]
-List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, int nRand, int q) {
+List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, int q) {
   // start time
   // We suppose that R1 = R2 = ... = Rd
   auto start = std::chrono::high_resolution_clock::now();
@@ -1187,6 +1186,9 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   NumericMatrix D(nout, n);
   if (q < 0) {
     cout << "q should be greater or equal to 0!" << "\n";
+  }
+  if (n < m) {
+    cout << "The number of observations should be greater or equal to the number of samples!" << "\n";
   }
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
@@ -1291,11 +1293,7 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
       // alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*alpha_custom;
     } 
     // sample according to alpha
-    if (t < nRand) {
-      rI = csample_num(indI, m, false, constVal);
-    } else { 
-      rI = csample_num(indI, m, false, alpha);
-    } 
+    rI = csample_num(indI, m, false, alpha);
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);

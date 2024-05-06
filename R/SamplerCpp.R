@@ -37,7 +37,7 @@ rssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000
 DiversityGibbs <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, method = "", gamma = 0.5, nRand = 10, q = 1) {
   res <- DiversityGibbsSamp(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method),
-              as.double(gamma), as.integer(nRand), as.double(q))
+              as.double(gamma), as.double(q))
   return(res)
 }
 
@@ -75,6 +75,6 @@ crsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, 
 cdsg <- function(X, hyper = c(1, 1, 1), K = 3, R = 3, m = 10, iteration = 1000, burnin = 50, thin = 5, gamma = 0.5, nRand = 10, q = 1) {
   res <- CDSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(R), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), as.double(gamma),
-              as.integer(nRand), as.integer(q))
+              as.integer(q))
   return(res)
 }

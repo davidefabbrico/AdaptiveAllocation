@@ -24,7 +24,7 @@ genGaussianGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
 genCategoricalGM <- function(n, K, d, categories = 3, concPar = 0.1) {
   data <- data.frame()
   for (k in 1:K) {
-    data_component <- matrix(sample(categories, floor(n/K) * d, replace = TRUE, prob = MCMCpack::rdirichlet(1, rep(concPar, categories))), ncol = d)
+    data_component <- matrix(sample(0:(categories-1), floor(n/K) * d, replace = TRUE, prob = MCMCpack::rdirichlet(1, rep(concPar, categories))), ncol = d)
     data <- rbind(data, data_component)
   }
   labels <- rep(0:(K-1), each = floor(n/K))

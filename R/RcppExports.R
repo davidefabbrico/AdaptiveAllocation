@@ -53,8 +53,8 @@ JS_distance <- function(p, q) {
     .Call(`_AdaptiveAllocation_JS_distance`, p, q)
 }
 
-DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, nRand, q) {
-    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, nRand, q)
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, method, gamma, q) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, method, gamma, q)
 }
 
 CSSG <- function(X, hyper, K, R, iteration, burnin, thin) {
@@ -65,7 +65,7 @@ CRSG <- function(X, hyper, K, R, m, iteration, burnin, thin) {
     .Call(`_AdaptiveAllocation_CRSG`, X, hyper, K, R, m, iteration, burnin, thin)
 }
 
-CDSG <- function(X, hyper, K, R, m, iteration, burnin, thin, gamma, nRand, q) {
-    .Call(`_AdaptiveAllocation_CDSG`, X, hyper, K, R, m, iteration, burnin, thin, gamma, nRand, q)
+CDSG <- function(X, hyper, K, R, m, iteration, burnin, thin, gamma, q) {
+    .Call(`_AdaptiveAllocation_CDSG`, X, hyper, K, R, m, iteration, burnin, thin, gamma, q)
 }
 
