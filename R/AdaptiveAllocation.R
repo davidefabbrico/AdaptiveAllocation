@@ -25,4 +25,5 @@
 #' @import MASS
 #' @import ggplot2
 #' @import RColorBrewer
+#' @import MCMCpack
 NULL

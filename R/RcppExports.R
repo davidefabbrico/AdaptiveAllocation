@@ -41,8 +41,8 @@ myProduct <- function(a) {
     .Call(`_AdaptiveAllocation_myProduct`, a)
 }
 
-SSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAllocation) {
-    .Call(`_AdaptiveAllocation_SSG`, X, hyper, K, iteration, burnin, thin, method, trueAllocation)
+SSG <- function(X, hyper, K, iteration, burnin, thin, method) {
+    .Call(`_AdaptiveAllocation_SSG`, X, hyper, K, iteration, burnin, thin, method)
 }
 
 RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method) {

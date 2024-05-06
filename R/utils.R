@@ -1,7 +1,7 @@
-#' Generating Mechanism
+#' Gaussian Generating Mechanism
 #'
 #' @export
-genGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
+genGaussianGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
   matMean = matrix(0, nrow = K, ncol = d)
   listPrec = list()
   data <- data.frame()
@@ -16,6 +16,20 @@ genGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
   cluster_id <- rep(0:(K-1), each = round(n/K))
   data <- cbind(data, cluster_id)
   return(list(data, matMean, precMat))
+}
+
+#' Categorical Generating Mechanism
+#'
+#' @export
+genCategoricalGM <- function(n, K, d, categories = 3, concPar = 0.1) {
+  data <- data.frame()
+  for (k in 1:K) {
+    data_component <- matrix(sample(categories, floor(n/K) * d, replace = TRUE, prob = MCMCpack::rdirichlet(1, rep(concPar, categories))), ncol = d)
+    data <- rbind(data, data_component)
+  }
+  labels <- rep(0:(K-1), each = floor(n/K))
+  data <- data.frame(Data = data, Component = labels)
+  return(data)
 }
 
 #' 2d Contour Plot
@@ -70,3 +84,47 @@ psm <- function(z) {
   return(hm)
 }
 
+
+#' Posterior Summary - Categorical Data
+#' 
+#' @export
+
+heatMapCat <- function(dataMatrix, zCurr = NULL, zTrue = NULL, categories) {
+  if (categories == 2) {
+    if (!is.null(zCurr) && !is.null(zTrue)) {
+      currentAnnotationRow <- data.frame(
+        Cluster = factor(zCurr),
+        trueClusters = factor(zTrue)
+      )
+      rownames(currentAnnotationRow) <- rownames(dataMatrix)
+      phmap <- pheatmap(dataMatrix[sort(zCurr, index.return = T)$ix,], 
+                        cluster_rows = F, show_rownames = F, show_colnames = F, 
+                        color = colorRampPalette(colors = c("white", "black"))(2),
+                        annotation_row = currentAnnotationRow)
+    } else {
+      phmap <- pheatmap(dataMatrix, 
+                        cluster_rows = F, show_rownames = F, show_colnames = F, 
+                        color = colorRampPalette(colors = c("white", "black"))(2), 
+                        format = "d")
+    }
+  } else {
+    if (!is.null(zCurr) && !is.null(zTrue)) {
+      currentAnnotationRow <- data.frame(
+        Cluster = factor(zCurr),
+        trueClusters = factor(zTrue)
+      )
+      rownames(currentAnnotationRow) <- rownames(dataMatrix)
+      phmap <- pheatmap(dataMatrix[sort(zCurr, index.return = T)$ix,], 
+                        cluster_rows = F, show_rownames = F, show_colnames = F, 
+                        color = brewer.pal(n = categories, name = "Spectral"),
+                        annotation_row = currentAnnotationRow)
+    } else {
+      phmap <- pheatmap(dataMatrix, 
+                        cluster_rows = F, show_rownames = F, show_colnames = F, 
+                        color = brewer.pal(n = categories, name = "Spectral"), 
+                        format = "d")
+    }
+  }
+  
+  return(phmap)
+}
