@@ -26,4 +26,6 @@
 #' @import ggplot2
 #' @import RColorBrewer
 #' @import MCMCpack
+#' @import pheatmap
+#' @import mclust
 NULL
