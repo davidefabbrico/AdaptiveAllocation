@@ -625,7 +625,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q, double lambda, String DivIndex) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -754,43 +754,30 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       probAllocation(i, _) = probAllocation(i, _) / rSum(i);
     }
     NumericVector Diversity(n);
-    // if (q == 1) {
-    //   for (int i = 0; i<n; i++) {
-    //     for (int k = 0; k<K; k++) {
-    //       if (probAllocation(i, k) == 0) {
-    //         Diversity(i) = Diversity(i) + 0; // define log(0) = 0 (by Paul's note)
-    //       } else {
-    //         Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k)); 
-    //       }
-    //     }
-    //     Diversity(i) = -Diversity(i);
-    //   }
-    // } else {
-    //   for (int i = 0; i<n; i++) {
-    //     for (int k = 0; k<K; k++) {
-    //       Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
-    //     }
-    //     Diversity(i) = (1-Diversity(i))/(q-1);
-    //   }
-    // }
-    if (q == 1) {
-      for (int i = 0; i<n; i++) {
-        if (probAllocation(i, z(i)) == 0) {
-          Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
-        } else {
-          Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+    if (DivIndex == "Generalized") {
+      if (q == 1) {
+        for (int i = 0; i<n; i++) {
+          if (probAllocation(i, z(i)) == 0) {
+            Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
+          } else {
+            Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+          }
+          Diversity(i) = -Diversity(i);
         }
-        Diversity(i) = -Diversity(i);
+      } else if (q == 0) {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = 1 - probAllocation(i, z(i));
+        }
+      } else {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = pow(probAllocation(i, z(i)), q);
+        }
+        Diversity = (1-Diversity)/(q-1);
       }
-    } else if (q == 0) {
+    } else if (DivIndex == "Double-Exponential") {
       for (int i = 0; i<n; i++) {
-        Diversity(i) = 1 - probAllocation(i, z(i));
+        Diversity(i) = (lambda/2)*exp(-lambda*abs(probAllocation(i, z(i))));
       }
-    } else {
-      for (int i = 0; i<n; i++) {
-        Diversity(i) = pow(probAllocation(i, z(i)), q);
-      }
-      Diversity = (1-Diversity)/(q-1);
     }
     // Normalize
     double sumDiv = sum(Diversity);
