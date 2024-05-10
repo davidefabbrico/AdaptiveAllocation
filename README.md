@@ -47,8 +47,6 @@ n <- 1000 # observation
 d <- 30  # dimension
 K <- 10 # cluster
 data <- AdaptiveAllocation::genGaussianGM(n = n, d = d, K = K)
-# visualize the scatter plot (only in 2d)
-AdaptiveAllocation::scattPlot2d(data = data[[1]][,1:d])
 # MCMC settings
 iter <- 1000
 burnin <- 0
