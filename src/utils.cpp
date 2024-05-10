@@ -791,7 +791,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         }
         Diversity = (1-Diversity)/(q-1);
       }
-    } else if (DiversityIndex == "Double-Exponential") {
+    } else if (DiversityIndex == "Laplace") {
       for (int i = 0; i<n; i++) {
         // Double Exponetial
         Diversity(i) = (q/2)*exp(-q*probAllocation(i, z(i)));
