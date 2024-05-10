@@ -198,13 +198,22 @@ double myProduct(arma::vec a) {
   return prod;
 }
 
+// [[Rcpp::export]]
+double mySum(arma::vec a) {
+  double somma = 0;
+  int n = a.n_elem;
+  for (int i = 0; i<n; i++) {
+    somma = somma + a(i);
+  }
+  return somma;
+}
 
 ////////////////////////////////////////////////////
 //////////////// D-Dimensional Data ////////////////
 ///////////////////////////////////////////////////
 
 // [[Rcpp::export]]
-List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method) {
+List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method, bool trueAll) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -260,9 +269,15 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   for (int k = 0; k<K; k++) {
     probC(k) = hyper(0)/K;
   } 
-  for (int i = 0; i<n; i++) {
-    z(i) = csample_num(indC, 1, true, probC)(0);
-  } 
+  if (trueAll) {
+    for (int k = 0; k < K; k++) {
+      z.subvec(k * (n/K), (k+1) * (n/K) - 1).fill(k);
+    }
+  } else {
+    for (int i = 0; i<n; i++) {
+      z(i) = csample_num(indC, 1, true, probC)(0);
+    } 
+  }
   // PI
   arma::rowvec pi(K);
   arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
@@ -303,9 +318,9 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
       for (int k = 0; k<K; k++) {
         arma::vec vecTmp(d);
         for (int j = 0; j<d; j++) {
-          vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), FALSE);
+          vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
         }
-        probAllocation(i,k) = pi(k)*myProduct(vecTmp);
+        probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp));
       } 
     }
     // Normalize the rows
@@ -314,9 +329,11 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
       probAllocation(i, _) = probAllocation(i, _) / rSum(i);
     }
     // update z
+    // if (trueAll == false) {
     for (int i = 0; i<n; i++) {
       z(i) = csample_num(indC, 1, false, probAllocation(i, _))(0);
-    }
+    } 
+    // }
     // compute N
     arma::irowvec N(K);
     for (int i = 0; i < n; i++) {
@@ -511,9 +528,9 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
       for (int k = 0; k<K; k++) {
         arma::vec vecTmp(d);
         for (int j = 0; j<d; j++) {
-          vecTmp(j) = R::dnorm(X(rI[i],j), mu(k,j), sqrt(1.0/prec(k,j)), FALSE);
+          vecTmp(j) = R::dnorm(X(rI[i],j), mu(k,j), sqrt(1.0/prec(k,j)), true);
         }
-        probAllocation(rI[i],k) = pi(k)*myProduct(vecTmp);
+        probAllocation(rI[i],k) = exp(log(pi(k)) + mySum(vecTmp)) + 0.00001;
       } 
     }
     // Normalize the rows
@@ -625,7 +642,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q, String DiversityIndex) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -743,9 +760,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       for (int k = 0; k<K; k++) {
         arma::vec vecTmp(d);
         for (int j = 0; j<d; j++) {
-          vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), FALSE);
+          vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
         }
-        probAllocation(i,k) = pi(k)*myProduct(vecTmp);
+        probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + 0.00001;
       } 
     }
     // Normalize the rows
@@ -754,43 +771,31 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       probAllocation(i, _) = probAllocation(i, _) / rSum(i);
     }
     NumericVector Diversity(n);
-    // if (q == 1) {
-    //   for (int i = 0; i<n; i++) {
-    //     for (int k = 0; k<K; k++) {
-    //       if (probAllocation(i, k) == 0) {
-    //         Diversity(i) = Diversity(i) + 0; // define log(0) = 0 (by Paul's note)
-    //       } else {
-    //         Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k)); 
-    //       }
-    //     }
-    //     Diversity(i) = -Diversity(i);
-    //   }
-    // } else {
-    //   for (int i = 0; i<n; i++) {
-    //     for (int k = 0; k<K; k++) {
-    //       Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
-    //     }
-    //     Diversity(i) = (1-Diversity(i))/(q-1);
-    //   }
-    // }
-    if (q == 1) {
-      for (int i = 0; i<n; i++) {
-        if (probAllocation(i, z(i)) == 0) {
-          Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
-        } else {
-          Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+    if (DiversityIndex == "Generalized") {
+      if (q == 1) {
+        for (int i = 0; i<n; i++) {
+          if (probAllocation(i, z(i)) == 0) {
+            Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
+          } else {
+            Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+          }
+          Diversity(i) = -Diversity(i);
         }
-        Diversity(i) = -Diversity(i);
+      } else if (q == 0) {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = 1 - probAllocation(i, z(i));
+        }
+      } else {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = pow(probAllocation(i, z(i)), q);
+        }
+        Diversity = (1-Diversity)/(q-1);
       }
-    } else if (q == 0) {
+    } else if (DiversityIndex == "Double-Exponential") {
       for (int i = 0; i<n; i++) {
-        Diversity(i) = 1 - probAllocation(i, z(i));
+        // Double Exponetial
+        Diversity(i) = (q/2)*exp(-q*probAllocation(i, z(i)));
       }
-    } else {
-      for (int i = 0; i<n; i++) {
-        Diversity(i) = pow(probAllocation(i, z(i)), q);
-      }
-      Diversity = (1-Diversity)/(q-1);
     }
     // Normalize
     double sumDiv = sum(Diversity);
