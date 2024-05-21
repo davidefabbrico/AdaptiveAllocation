@@ -6,7 +6,7 @@ genGaussianGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
   listPrec = list()
   data <- data.frame()
   for (k in 1:K) {
-    matMean[k, ] <- sample(startM:endM, d, replace = TRUE)
+    matMean[k, ] <- sample(startM:endM, d, replace = TRUE)/sqrt(d) # miller and harrison JASA
     precMat <- diag(d)
     diag(precMat) <- 1/sample(startP:endP, d, replace = TRUE)
     listPrec[[k]] <- precMat

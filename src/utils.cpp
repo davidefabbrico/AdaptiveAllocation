@@ -642,7 +642,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q, String DiversityIndex) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -756,22 +756,44 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
     // update probability
-    for (int i = 0; i<n; i++) {
-      for (int k = 0; k<K; k++) {
-        arma::vec vecTmp(d);
-        for (int j = 0; j<d; j++) {
-          vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
-        }
-        probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + 0.00001;
-      } 
-    }
-    // Normalize the rows
-    arma::vec rSum = rowSums(probAllocation);
-    for (int i = 0; i<n; i++) {
-      probAllocation(i, _) = probAllocation(i, _) / rSum(i);
+    if (t%updateProbAlloc == 0) {
+      for (int i = 0; i<n; i++) {
+        for (int k = 0; k<K; k++) {
+          arma::vec vecTmp(d);
+          for (int j = 0; j<d; j++) {
+            vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
+          }
+          probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + 0.00001;
+        } 
+      }
+      // Normalize the rows
+      arma::vec rSum = rowSums(probAllocation);
+      for (int i = 0; i<n; i++) {
+        probAllocation(i, _) = probAllocation(i, _) / rSum(i);
+      }
     }
     NumericVector Diversity(n);
-    if (DiversityIndex == "Generalized") {
+    if (DiversityIndex == "Generalized-Entropy") {
+      if (q == 1) {
+        for (int i = 0; i<n; i++) {
+          if (probAllocation(i, z(i)) == 0) {
+            Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
+          } else {
+            Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+          } 
+          Diversity(i) = -Diversity(i);
+        } 
+      } else if (q == 0) {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = 1 - probAllocation(i, z(i));
+        } 
+      } else {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = pow(probAllocation(i, z(i)), q);
+        } 
+        Diversity = (1-Diversity)/(q-1);
+      } 
+    } else if (DiversityIndex == "Partial-Generalized-Entropy") {
       if (q == 1) {
         for (int i = 0; i<n; i++) {
           if (probAllocation(i, z(i)) == 0) {
@@ -791,10 +813,31 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         }
         Diversity = (1-Diversity)/(q-1);
       }
-    } else if (DiversityIndex == "Laplace") {
+    } else if (DiversityIndex == "Half-Laplace") {
       for (int i = 0; i<n; i++) {
-        // Double Exponetial
-        Diversity(i) = (q/2)*exp(-q*probAllocation(i, z(i)));
+        // Half-Laplace
+        Diversity(i) = (lambda/2)*exp(-lambda*probAllocation(i, z(i)));
+      }
+    } else if (DiversityIndex == "Exponential") {
+      for (int i = 0; i<n; i++) {
+        // Exponetial
+        Diversity(i) = lambda*exp(-lambda*probAllocation(i, z(i)));
+      }
+    } else if (DiversityIndex == "Pareto") {
+      for (int i = 0; i<n; i++) {
+        // Pareto
+        Diversity(i) = (alphaPareto*pow(xmPareto, alphaPareto))/pow(probAllocation(i, z(i)), alphaPareto + 1);
+      }
+    }
+    else if (DiversityIndex == "Weibull") {
+      for (int i = 0; i<n; i++) {
+        // Weibull
+        Diversity(i) = (kWeibull/lambda)*pow(probAllocation(i, z(i)), kWeibull-1)*exp(-pow(probAllocation(i, z(i)/lambda), kWeibull));
+      }
+    } else if (DiversityIndex == "Hyperbole") {
+      for (int i = 0; i<n; i++) {
+        // Hyperbole
+        Diversity(i) = pow(1/(probAllocation(i, z(i)) + 0.0001), lambda);
       }
     }
     // Normalize
@@ -836,8 +879,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
           sampMean(k,j) = sampMean(k,j) + diracF(z(i), k)*X(i, j);
         }
       } 
-    } 
-    
+    }
     for (int j = 0; j<d; j++) {
       for (int k = 0; k<K; k++) {
         muPost = (prec(k,j)*sampMean(k,j)+hyper(2)*hyper(3))/(prec(k,j)*N(k)+hyper(3));
