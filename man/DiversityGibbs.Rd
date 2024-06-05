@@ -12,10 +12,16 @@ DiversityGibbs(
   iteration = 1000,
   burnin = 50,
   thin = 5,
+  updateProbAllocation = 1,
   method = "",
   gamma = 0.5,
-  nRand = 10,
-  q = 1
+  q = 1,
+  lambda = 1,
+  kWeibull = 1,
+  alphaPareto = 1,
+  xmPareto = 0.5,
+  DiversityIndex = "Half-Laplace",
+  adaptive = FALSE
 )
 }
 \description{

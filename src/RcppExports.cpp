@@ -131,9 +131,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// mySum
+double mySum(arma::vec a);
+RcppExport SEXP _AdaptiveAllocation_mySum(SEXP aSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type a(aSEXP);
+    rcpp_result_gen = Rcpp::wrap(mySum(a));
+    return rcpp_result_gen;
+END_RCPP
+}
 // SSG
-List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method);
-RcppExport SEXP _AdaptiveAllocation_SSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP) {
+List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method, bool trueAll);
+RcppExport SEXP _AdaptiveAllocation_SSG(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP trueAllSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -144,7 +155,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
     Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
     Rcpp::traits::input_parameter< String >::type method(methodSEXP);
-    rcpp_result_gen = Rcpp::wrap(SSG(X, hyper, K, iteration, burnin, thin, method));
+    Rcpp::traits::input_parameter< bool >::type trueAll(trueAllSEXP);
+    rcpp_result_gen = Rcpp::wrap(SSG(X, hyper, K, iteration, burnin, thin, method, trueAll));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -179,8 +191,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // DiversityGibbsSamp
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, String method, double gamma, double q);
-RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP qSEXP) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive);
+RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP updateProbAllocSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP qSEXP, SEXP lambdaSEXP, SEXP kWeibullSEXP, SEXP alphaParetoSEXP, SEXP xmParetoSEXP, SEXP DiversityIndexSEXP, SEXP adaptiveSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -191,10 +203,17 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
     Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
+    Rcpp::traits::input_parameter< int >::type updateProbAlloc(updateProbAllocSEXP);
     Rcpp::traits::input_parameter< String >::type method(methodSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     Rcpp::traits::input_parameter< double >::type q(qSEXP);
-    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, thin, method, gamma, q));
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type kWeibull(kWeibullSEXP);
+    Rcpp::traits::input_parameter< double >::type alphaPareto(alphaParetoSEXP);
+    Rcpp::traits::input_parameter< double >::type xmPareto(xmParetoSEXP);
+    Rcpp::traits::input_parameter< String >::type DiversityIndex(DiversityIndexSEXP);
+    Rcpp::traits::input_parameter< bool >::type adaptive(adaptiveSEXP);
+    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -265,10 +284,11 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_coefBinom", (DL_FUNC) &_AdaptiveAllocation_coefBinom, 2},
     {"_AdaptiveAllocation_ari", (DL_FUNC) &_AdaptiveAllocation_ari, 2},
     {"_AdaptiveAllocation_myProduct", (DL_FUNC) &_AdaptiveAllocation_myProduct, 1},
-    {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 7},
+    {"_AdaptiveAllocation_mySum", (DL_FUNC) &_AdaptiveAllocation_mySum, 1},
+    {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 8},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},
     {"_AdaptiveAllocation_JS_distance", (DL_FUNC) &_AdaptiveAllocation_JS_distance, 2},
-    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 10},
+    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 17},
     {"_AdaptiveAllocation_CSSG", (DL_FUNC) &_AdaptiveAllocation_CSSG, 7},
     {"_AdaptiveAllocation_CRSG", (DL_FUNC) &_AdaptiveAllocation_CRSG, 8},
     {"_AdaptiveAllocation_CDSG", (DL_FUNC) &_AdaptiveAllocation_CDSG, 10},

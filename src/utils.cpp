@@ -642,7 +642,7 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive) {
   // precision and not variance!!
   // m: how many observation I want to update
   // start time
@@ -669,6 +669,10 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   int idx = 0;
   // Z
   arma::imat Z(nout, n);
+  // Probability allocation
+  List PROB(nout);
+  // Diversity Probability
+  NumericVector PDIV(nout);
   // ALPHA
   NumericMatrix ALPHA(nout, n);
   // PI
@@ -751,6 +755,11 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   NumericVector alpha(n);
   NumericVector alpha_prec(n);
   NumericVector alpha_custom(n);
+  // adaptive diversity function
+  NumericVector probDiv(m);
+  double pDiv = 0.0;
+  double pDivNew = 0.0;
+  double pMeanDiv = 0.0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -772,31 +781,50 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         probAllocation(i, _) = probAllocation(i, _) / rSum(i);
       }
     }
+    if (adaptive) {
+      DiversityIndex = "Half-Laplace";
+      double pMeanDivS = pow(pMeanDiv, 3);// pow(pMeanDiv, 3);
+      if (pMeanDivS <= 0.04) {
+        lambda = 25.0;
+      } else {
+        lambda = ceil(1.0/(2*pMeanDivS));
+        // lambda = 1.0/(2*pMeanDivS);
+      }
+      // DiversityIndex = "Exponential";
+      // DiversityIndex = "Truncated-Exponential";
+      // double pMeanDivS = pow(pMeanDiv, 2);
+      // if (pMeanDivS <= 0.05) {
+      //   lambda = 20.0;
+      // } else {
+      //   lambda = ceil(1.0/pMeanDivS);
+      // }
+      // cout << lambda << " ";
+    }
     NumericVector Diversity(n);
     if (DiversityIndex == "Generalized-Entropy") {
       if (q == 1) {
         for (int i = 0; i<n; i++) {
-          if (probAllocation(i, z(i)) == 0) {
-            Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
-          } else {
-            Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
-          } 
+          for (int k = 0; k<K; k++) {
+            if (probAllocation(i, k) == 0) {
+              Diversity(i) = Diversity(i) + 0; // define log(0) = 0 (by Paul's note)
+            } else {
+              Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k)); 
+            }
+          }
           Diversity(i) = -Diversity(i);
-        } 
-      } else if (q == 0) {
-        for (int i = 0; i<n; i++) {
-          Diversity(i) = 1 - probAllocation(i, z(i));
-        } 
+        }
       } else {
         for (int i = 0; i<n; i++) {
-          Diversity(i) = pow(probAllocation(i, z(i)), q);
-        } 
-        Diversity = (1-Diversity)/(q-1);
+          for (int k = 0; k<K; k++) {
+            Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
+          }
+          Diversity(i) = (1-Diversity(i))/(q-1);
+        }
       } 
     } else if (DiversityIndex == "Partial-Generalized-Entropy") {
       if (q == 1) {
         for (int i = 0; i<n; i++) {
-          if (probAllocation(i, z(i)) == 0) {
+          if (probAllocation(i, z(i)) == 0.00) {
             Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
           } else {
             Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
@@ -839,6 +867,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         // Hyperbole
         Diversity(i) = pow(1/(probAllocation(i, z(i)) + 0.0001), lambda);
       }
+    } else if (DiversityIndex == "Truncated-Exponential") {
+      for (int i = 0; i<n; i++) {
+        // Exponetial
+        double numTExp = lambda*exp(-probAllocation(i, z(i))*lambda);
+        double denTExp = 1 - exp(lambda);
+        Diversity(i) = numTExp/denTExp;
+      }
     }
     // Normalize
     double sumDiv = sum(Diversity);
@@ -850,10 +885,16 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       alpha = gamma*Diversity+(1-gamma)*constVal;
     } else {
       alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
-      // alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*alpha_custom;
     }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
+    // check the mean probability
+    for (int i = 0; i<m; i++) {
+      probDiv(i) = probAllocation(rI[i], z(rI[i]));
+    }
+    pDivNew = mean(probDiv);
+    pMeanDiv = (pDivNew + pDiv)/2;
+    pDiv = pDivNew;
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
@@ -909,6 +950,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     ///////////////////////////////////////////////////
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
+      PDIV[idx] = pMeanDiv;
+      PROB[idx] = probAllocation;
       ALPHA.row(idx) = alpha;
       PI.row(idx) = pi;
       D.row(idx) = Diversity;
@@ -924,6 +967,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   return List::create(Named("Allocation") = Z,
+                      Named("Probability") = PROB,
+                      Named("Mean_Probability") = PDIV,
                       Named("Diversity") = D,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
