@@ -3,6 +3,7 @@
 #include <R.h>
 #include <Rmath.h>
 #include <stdlib.h> 
+#include <limits.h>
 #include <chrono>
 #include <RcppArmadilloExtensions/sample.h>
 
@@ -16,7 +17,7 @@ using namespace std;
 // From Bayesian Regularization for Normal Mixture Estimation and Model-Based Clustering 
 // by Fraley and Raftery page 159-160. We have 4 more hyperparameters:
 // 1. mu ~ N(muP, sigma^2/kP)
-// 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2) !!!!Occhio is conditional!!!.
+// 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2) !!!!is conditional!!!.
 // for the mean the mean of the data. kP = 0.01
 // vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
 // [X] Random Gibbs sampler
@@ -29,7 +30,7 @@ using namespace std;
 // [X] Check the full conditional with the new Regularization
 // [X] Evaluate Convergence
 // [ ] Code Optimization
-// [ ] How many time I need to update the Prob Allocation Matrix?
+// [X] How many time I need to update the Prob Allocation Matrix?
 
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
@@ -216,8 +217,6 @@ double mySum(arma::vec a) {
 List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method, bool trueAll) {
   // precision and not variance!!
   // m: how many observation I want to update
-  // start time
-  auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
   ///////////////////////////////////////////////////
@@ -232,6 +231,8 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   }
   // Z
   arma::imat Z(nout, n);
+  // TIME
+  NumericVector TIME(nout);
   // PI
   arma::mat PI(nout, K);
   // MU
@@ -311,7 +312,10 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
+  double durationOld;
   for (int t = 0; t<iteration; t++) {
+    // start time
+    auto start = std::chrono::high_resolution_clock::now();
     // update probability
     // STEP 1. Compute the probability
     for (int i = 0; i<n; i++) {
@@ -320,7 +324,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
         for (int j = 0; j<d; j++) {
           vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
         }
-        probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp));
+        probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + std::numeric_limits<double>::denorm_min();;
       } 
     }
     // Normalize the rows
@@ -383,25 +387,27 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();//1000000;
+    durationOld = duration;
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
       PI.row(idx) = pi;
+      TIME[idx] = duration;
       MU[idx] = mu;
       PREC[idx] = prec;
       idx = idx + 1;
     }
-    if (t%1000 == 0 && t > 0) {
+    if (t%5000 == 0 && t > 0) {
       std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
     }
   }
   std::cout << "End MCMC!\n";
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   return List::create(Named("Allocation") = Z,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
                       Named("Precision") = PREC,
-                      Named("Execution_Time") = duration/1000000);
+                      Named("Execution_Time") = TIME);
 }
 
 
@@ -415,8 +421,6 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
 List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method) {
   // precision and not variance!!
   // m: how many observation I want to update
-  // start time
-  auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
   ///////////////////////////////////////////////////
@@ -443,6 +447,8 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   NumericMatrix ALPHA(nout, n);
   // PI
   arma::mat PI(nout, K);
+  // Time 
+  NumericVector TIME(nout);
   // Entropy
   NumericMatrix D(nout, n);
   // MU
@@ -516,10 +522,14 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
   NumericMatrix probAllocation(n, K);
   // alpha uniform weight 
   NumericVector alpha = constVal;
+  // Time 
+  double durationOld;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
+    // start time
+    auto start = std::chrono::high_resolution_clock::now();
     // sample according to alpha (uniform)
     rI = csample_num(indI, m, false, alpha);
     // update probability
@@ -530,7 +540,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
         for (int j = 0; j<d; j++) {
           vecTmp(j) = R::dnorm(X(rI[i],j), mu(k,j), sqrt(1.0/prec(k,j)), true);
         }
-        probAllocation(rI[i],k) = exp(log(pi(k)) + mySum(vecTmp)) + 0.00001;
+        probAllocation(rI[i],k) = exp(log(pi(k)) + mySum(vecTmp)) + std::numeric_limits<double>::denorm_min();
       } 
     }
     // Normalize the rows
@@ -591,25 +601,27 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin,
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();//1000000;
+    durationOld = duration;
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
       PI.row(idx) = pi;
+      TIME[idx] = duration;
       MU[idx] = mu;
       PREC[idx] = prec;
       idx = idx + 1;
     }
-    if (t%1000 == 0 && t > 0) {
+    if (t%5000 == 0 && t > 0) {
       std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
     }
   }
   std::cout << "End MCMC!\n";
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   return List::create(Named("Allocation") = Z,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
                       Named("Precision") = PREC,
-                      Named("Execution_Time") = duration/1000000);
+                      Named("Execution_Time") = TIME);
 }
 
 ////////////////////////////////////////////////////
@@ -642,11 +654,15 @@ double JS_distance(NumericVector p, NumericVector q) {
 
 
 // [[Rcpp::export]]
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, 
+                        double m, int iteration, int burnin, int iterTuning, 
+                        int thin, int updateProbAlloc, String method, 
+                        double gamma, double q, double lambda, 
+                        double kWeibull, double alphaPareto, 
+                        double xmPareto, String DiversityIndex, 
+                        bool adaptive) {
   // precision and not variance!!
   // m: how many observation I want to update
-  // start time
-  auto start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
   ///////////////////////////////////////////////////
@@ -667,12 +683,18 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     constVal(i) = 1.0/n;
   }
   int idx = 0;
+  // TIME 
+  NumericVector TIME(nout);
   // Z
   arma::imat Z(nout, n);
+  // Parameter
+  NumericVector PAR(nout);
   // Probability allocation
   List PROB(nout);
   // Diversity Probability
   NumericVector PDIV(nout);
+  // Diversity Probability Standard Deviation
+  NumericVector PSD(nout);
   // ALPHA
   NumericMatrix ALPHA(nout, n);
   // PI
@@ -756,14 +778,18 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
   NumericVector alpha_prec(n);
   NumericVector alpha_custom(n);
   // adaptive diversity function
-  NumericVector probDiv(m);
-  double pDiv = 0.0;
-  double pDivNew = 0.0;
-  double pMeanDiv = 0.0;
+  arma::vec probDiv(n);
+  double pS;
+  double pSSd;
+  // double lambdaOld = lambda;
+  // Time 
+  double durationOld;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
+    // start time
+    auto start = std::chrono::high_resolution_clock::now();
     // update probability
     if (t%updateProbAlloc == 0) {
       for (int i = 0; i<n; i++) {
@@ -772,7 +798,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
           for (int j = 0; j<d; j++) {
             vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
           }
-          probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + 0.00001;
+          probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + std::numeric_limits<double>::denorm_min();
         } 
       }
       // Normalize the rows
@@ -781,24 +807,15 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         probAllocation(i, _) = probAllocation(i, _) / rSum(i);
       }
     }
-    if (adaptive) {
-      DiversityIndex = "Half-Laplace";
-      double pMeanDivS = pow(pMeanDiv, 3);// pow(pMeanDiv, 3);
-      if (pMeanDivS <= 0.04) {
-        lambda = 25.0;
+    if (adaptive && t <= iterTuning) {
+      DiversityIndex = "Exponential";
+      // double pC = pow(pS, 3);
+      // lambda = 1.0/pC;
+      if (t >= ceil((n*(K-1))/(m*K))) { // (n*(K-1))/(m*K))
+        lambda = 30*pow(0.996, t) + 1;
       } else {
-        lambda = ceil(1.0/(2*pMeanDivS));
-        // lambda = 1.0/(2*pMeanDivS);
+        lambda = 30;
       }
-      // DiversityIndex = "Exponential";
-      // DiversityIndex = "Truncated-Exponential";
-      // double pMeanDivS = pow(pMeanDiv, 2);
-      // if (pMeanDivS <= 0.05) {
-      //   lambda = 20.0;
-      // } else {
-      //   lambda = ceil(1.0/pMeanDivS);
-      // }
-      // cout << lambda << " ";
     }
     NumericVector Diversity(n);
     if (DiversityIndex == "Generalized-Entropy") {
@@ -841,11 +858,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         }
         Diversity = (1-Diversity)/(q-1);
       }
-    } else if (DiversityIndex == "Half-Laplace") {
-      for (int i = 0; i<n; i++) {
-        // Half-Laplace
-        Diversity(i) = (lambda/2)*exp(-lambda*probAllocation(i, z(i)));
-      }
     } else if (DiversityIndex == "Exponential") {
       for (int i = 0; i<n; i++) {
         // Exponetial
@@ -854,7 +866,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     } else if (DiversityIndex == "Pareto") {
       for (int i = 0; i<n; i++) {
         // Pareto
-        Diversity(i) = (alphaPareto*pow(xmPareto, alphaPareto))/pow(probAllocation(i, z(i)), alphaPareto + 1);
+        Diversity(i) = (alphaPareto*pow(xmPareto, alphaPareto))/pow(probAllocation(i, z(i))+0.00001, alphaPareto + 1);
       }
     }
     else if (DiversityIndex == "Weibull") {
@@ -867,13 +879,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
         // Hyperbole
         Diversity(i) = pow(1/(probAllocation(i, z(i)) + 0.0001), lambda);
       }
-    } else if (DiversityIndex == "Truncated-Exponential") {
-      for (int i = 0; i<n; i++) {
-        // Exponetial
-        double numTExp = lambda*exp(-probAllocation(i, z(i))*lambda);
-        double denTExp = 1 - exp(lambda);
-        Diversity(i) = numTExp/denTExp;
-      }
     }
     // Normalize
     double sumDiv = sum(Diversity);
@@ -884,17 +889,25 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     if (t == 0 || t == 1) {
       alpha = gamma*Diversity+(1-gamma)*constVal;
     } else {
-      alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+      double tmp;
+      if (t <= ceil((n*(K-1))/(m*K))) { 
+        tmp = ceil((m*K*t)/(n*(K-1)));
+      } else {
+        tmp = t/2;
+      }
+      // alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
+      alpha = alpha_prec*(tmp/(1.0+tmp))+(1.0/(1.0+tmp))*(gamma*Diversity+(1-gamma)*constVal);
     }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // check the mean probability
-    for (int i = 0; i<m; i++) {
-      probDiv(i) = probAllocation(rI[i], z(rI[i]));
+    if (adaptive) {
+      for (int i = 0; i<n; i++) {
+        probDiv(i) = probAllocation(i, z(i));
+      }
+      pSSd = sqrt(var(probDiv));
+      pS = mean(probDiv);
     }
-    pDivNew = mean(probDiv);
-    pMeanDiv = (pDivNew + pDiv)/2;
-    pDiv = pDivNew;
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
@@ -948,9 +961,15 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();//1000000;
+    durationOld = duration;
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
-      PDIV[idx] = pMeanDiv;
+      PDIV[idx] = pS;
+      PSD[idx] = pSSd;
+      TIME[idx] = duration;
+      PAR[idx] = lambda;
       PROB[idx] = probAllocation;
       ALPHA.row(idx) = alpha;
       PI.row(idx) = pi;
@@ -959,22 +978,22 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int itera
       PREC[idx] = prec;
       idx = idx + 1;
     }
-    if (t%1000 == 0 && t > 0) {
+    if (t%5000 == 0 && t > 0) {
       std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
     }
   }
   std::cout << "End MCMC!\n";
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
   return List::create(Named("Allocation") = Z,
                       Named("Probability") = PROB,
+                      Named("Parameter") = PAR,
+                      Named("Sd_Probability") = PSD,
                       Named("Mean_Probability") = PDIV,
                       Named("Diversity") = D,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
                       Named("Precision") = PREC,
                       Named("Alpha") = ALPHA,
-                      Named("Execution_Time") = duration/1000000);
+                      Named("Execution_Time") = TIME);
   
 }
 
