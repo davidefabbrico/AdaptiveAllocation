@@ -55,6 +55,30 @@ arma::mat customMatrix(arma::irowvec z) {
   return(A);
 }
 
+// [[Rcpp::export]]
+double tanup(int t, double s, double a) {
+  double result = 0.5 * (1 + tanh((t - s) / a));
+  return result;
+}
+
+// [[Rcpp::export]]
+double tanlo(int t, double s, double a) {
+  double result = 0.5 * (1 - tanh((t - s) / a));
+  return result;
+}
+
+// [[Rcpp::export]]
+double expup(int t, double s) {
+  double result = exp(t)/(s+exp(t));
+  return result;
+}
+
+// [[Rcpp::export]]
+double explo(int t, double s) {
+  double result = s/(s+exp(t));
+  return result;
+}
+
 
 // come campionare da una distribuzione Gamma
 // [[Rcpp::export]]
@@ -779,9 +803,11 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   NumericVector alpha_custom(n);
   // adaptive diversity function
   arma::vec probDiv(n);
-  double pS;
-  double pSSd;
-  // double lambdaOld = lambda;
+  double pS = 0.0;
+  double pSSd = 0.0;
+  double sds = ceil(sqrt((n/m)*K*(K-1)));
+  double s = ceil((n/m)*(K-1)) + sds;
+  double a = 100;
   // Time 
   double durationOld;
   ////////////////////////////////////////////////////
@@ -809,13 +835,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     if (adaptive && t <= iterTuning) {
       DiversityIndex = "Exponential";
-      // double pC = pow(pS, 3);
-      // lambda = 1.0/pC;
-      if (t >= ceil((n*(K-1))/(m*K))) { // (n*(K-1))/(m*K))
-        lambda = 30*pow(0.996, t) + 1;
-      } else {
-        lambda = 30;
-      }
+      lambda = 40*pow(0.996, t) + 1; // 996
+      // if (t >= s) {
+      //   lambda = 1; // 30*pow(0.99, t) + 1; // 996
+      // } else {
+      //   lambda = 40*pow(0.99, t);
+      //   // DiversityIndex = "Entropy";
+      // }
     }
     NumericVector Diversity(n);
     if (DiversityIndex == "Generalized-Entropy") {
@@ -889,14 +915,35 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     if (t == 0 || t == 1) {
       alpha = gamma*Diversity+(1-gamma)*constVal;
     } else {
-      double tmp;
-      if (t <= ceil((n*(K-1))/(m*K))) { 
-        tmp = ceil((m*K*t)/(n*(K-1)));
-      } else {
-        tmp = t/2;
-      }
-      // alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
-      alpha = alpha_prec*(tmp/(1.0+tmp))+(1.0/(1.0+tmp))*(gamma*Diversity+(1-gamma)*constVal);
+      // con exp ho problemi numerici faccio exp(iterazioni)
+      // alpha = alpha_prec*expup(t, s)+explo(t, s)*(gamma*Diversity+(1-gamma)*constVal);
+      // if (t >= s) {
+      //   alpha = constVal;
+      // } else {
+      //   alpha = alpha_prec*(t/(1.0+t))+(1.0/(1.0+t))*(gamma*Diversity+(1-gamma)*constVal);
+      // }
+      // if (t >= s) {
+      //   double tmp = t/2;
+      //   alpha = alpha_prec*(tmp/(1.0+tmp))+(1.0/(1.0+tmp))*(gamma*Diversity+(1-gamma)*constVal);
+      // } else {
+      //   alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+      // }
+      // if (t % 10 == 0) {
+      //   // alpha = constVal;
+      //   gamma = 0.999;
+      // } else {
+      //   gamma = 0.01;
+      //   // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+      // }
+      alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+      // double tmp;
+      // if (t <= ceil((n*(K-1))/(m*K))) { // ceil(n/m)) {
+      //   tmp = ceil((m*K*t)/(n*(K-1)));
+      // } else {
+      //   // tmp = t/2;
+      //   tmp = t/((n*(K-1))/(m*K)*pow(0.99, t) + 1);
+      // }
+      // alpha = alpha_prec*(tmp/(1.0+tmp))+(1.0/(1.0+tmp))*(gamma*Diversity+(1-gamma)*constVal);
     }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
