@@ -22,6 +22,56 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tanup
+double tanup(int t, double s, double a);
+RcppExport SEXP _AdaptiveAllocation_tanup(SEXP tSEXP, SEXP sSEXP, SEXP aSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type t(tSEXP);
+    Rcpp::traits::input_parameter< double >::type s(sSEXP);
+    Rcpp::traits::input_parameter< double >::type a(aSEXP);
+    rcpp_result_gen = Rcpp::wrap(tanup(t, s, a));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tanlo
+double tanlo(int t, double s, double a);
+RcppExport SEXP _AdaptiveAllocation_tanlo(SEXP tSEXP, SEXP sSEXP, SEXP aSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type t(tSEXP);
+    Rcpp::traits::input_parameter< double >::type s(sSEXP);
+    Rcpp::traits::input_parameter< double >::type a(aSEXP);
+    rcpp_result_gen = Rcpp::wrap(tanlo(t, s, a));
+    return rcpp_result_gen;
+END_RCPP
+}
+// expup
+double expup(int t, double s);
+RcppExport SEXP _AdaptiveAllocation_expup(SEXP tSEXP, SEXP sSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type t(tSEXP);
+    Rcpp::traits::input_parameter< double >::type s(sSEXP);
+    rcpp_result_gen = Rcpp::wrap(expup(t, s));
+    return rcpp_result_gen;
+END_RCPP
+}
+// explo
+double explo(int t, double s);
+RcppExport SEXP _AdaptiveAllocation_explo(SEXP tSEXP, SEXP sSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type t(tSEXP);
+    Rcpp::traits::input_parameter< double >::type s(sSEXP);
+    rcpp_result_gen = Rcpp::wrap(explo(t, s));
+    return rcpp_result_gen;
+END_RCPP
+}
 // callrgamma
 Rcpp::NumericVector callrgamma(int n, double shape, double scale);
 RcppExport SEXP _AdaptiveAllocation_callrgamma(SEXP nSEXP, SEXP shapeSEXP, SEXP scaleSEXP) {
@@ -191,8 +241,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // DiversityGibbsSamp
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive);
-RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP thinSEXP, SEXP updateProbAllocSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP qSEXP, SEXP lambdaSEXP, SEXP kWeibullSEXP, SEXP alphaParetoSEXP, SEXP xmParetoSEXP, SEXP DiversityIndexSEXP, SEXP adaptiveSEXP) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int iterTuning, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive, double nSD, double lambda0, double zeta, double a);
+RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP iterTuningSEXP, SEXP thinSEXP, SEXP updateProbAllocSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP qSEXP, SEXP lambdaSEXP, SEXP kWeibullSEXP, SEXP alphaParetoSEXP, SEXP xmParetoSEXP, SEXP DiversityIndexSEXP, SEXP adaptiveSEXP, SEXP nSDSEXP, SEXP lambda0SEXP, SEXP zetaSEXP, SEXP aSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -202,6 +252,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type m(mSEXP);
     Rcpp::traits::input_parameter< int >::type iteration(iterationSEXP);
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< int >::type iterTuning(iterTuningSEXP);
     Rcpp::traits::input_parameter< int >::type thin(thinSEXP);
     Rcpp::traits::input_parameter< int >::type updateProbAlloc(updateProbAllocSEXP);
     Rcpp::traits::input_parameter< String >::type method(methodSEXP);
@@ -213,7 +264,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type xmPareto(xmParetoSEXP);
     Rcpp::traits::input_parameter< String >::type DiversityIndex(DiversityIndexSEXP);
     Rcpp::traits::input_parameter< bool >::type adaptive(adaptiveSEXP);
-    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive));
+    Rcpp::traits::input_parameter< double >::type nSD(nSDSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda0(lambda0SEXP);
+    Rcpp::traits::input_parameter< double >::type zeta(zetaSEXP);
+    Rcpp::traits::input_parameter< double >::type a(aSEXP);
+    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -275,6 +330,10 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_customMatrix", (DL_FUNC) &_AdaptiveAllocation_customMatrix, 1},
+    {"_AdaptiveAllocation_tanup", (DL_FUNC) &_AdaptiveAllocation_tanup, 3},
+    {"_AdaptiveAllocation_tanlo", (DL_FUNC) &_AdaptiveAllocation_tanlo, 3},
+    {"_AdaptiveAllocation_expup", (DL_FUNC) &_AdaptiveAllocation_expup, 2},
+    {"_AdaptiveAllocation_explo", (DL_FUNC) &_AdaptiveAllocation_explo, 2},
     {"_AdaptiveAllocation_callrgamma", (DL_FUNC) &_AdaptiveAllocation_callrgamma, 3},
     {"_AdaptiveAllocation_csample_num", (DL_FUNC) &_AdaptiveAllocation_csample_num, 4},
     {"_AdaptiveAllocation_diracF", (DL_FUNC) &_AdaptiveAllocation_diracF, 2},
@@ -288,7 +347,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 8},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},
     {"_AdaptiveAllocation_JS_distance", (DL_FUNC) &_AdaptiveAllocation_JS_distance, 2},
-    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 17},
+    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 22},
     {"_AdaptiveAllocation_CSSG", (DL_FUNC) &_AdaptiveAllocation_CSSG, 7},
     {"_AdaptiveAllocation_CRSG", (DL_FUNC) &_AdaptiveAllocation_CRSG, 8},
     {"_AdaptiveAllocation_CDSG", (DL_FUNC) &_AdaptiveAllocation_CDSG, 10},

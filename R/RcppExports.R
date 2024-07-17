@@ -5,6 +5,22 @@ customMatrix <- function(z) {
     .Call(`_AdaptiveAllocation_customMatrix`, z)
 }
 
+tanup <- function(t, s, a) {
+    .Call(`_AdaptiveAllocation_tanup`, t, s, a)
+}
+
+tanlo <- function(t, s, a) {
+    .Call(`_AdaptiveAllocation_tanlo`, t, s, a)
+}
+
+expup <- function(t, s) {
+    .Call(`_AdaptiveAllocation_expup`, t, s)
+}
+
+explo <- function(t, s) {
+    .Call(`_AdaptiveAllocation_explo`, t, s)
+}
+
 callrgamma <- function(n, shape, scale) {
     .Call(`_AdaptiveAllocation_callrgamma`, n, shape, scale)
 }
@@ -57,8 +73,8 @@ JS_distance <- function(p, q) {
     .Call(`_AdaptiveAllocation_JS_distance`, p, q)
 }
 
-DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive) {
-    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive)
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a)
 }
 
 CSSG <- function(X, hyper, K, R, iteration, burnin, thin) {
