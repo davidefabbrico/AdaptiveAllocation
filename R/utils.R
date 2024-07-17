@@ -6,14 +6,17 @@ genGaussianGM <- function(n, K, d, startM = 1, endM = 4, startP = 1, endP = 2) {
   listPrec = list()
   data <- data.frame()
   for (k in 1:K) {
-    matMean[k, ] <- sample(startM:endM, d, replace = TRUE)/sqrt(d) # miller and harrison JASA
+    matMean[k, ] <- sample(seq(startM, endM, length.out = 10), d, replace = TRUE)
     precMat <- diag(d)
     diag(precMat) <- 1/sample(startP:endP, d, replace = TRUE)
     listPrec[[k]] <- precMat
-    cluster <- mvrnorm(round(n/K), matMean[k,], listPrec[[k]])
+    cluster <- mvrnorm(round(n/K), matMean[k,]/sqrt(d), listPrec[[k]])
     data <- rbind(data, cluster)
   }
   cluster_id <- rep(0:(K-1), each = round(n/K))
+  for (j in 1:dim(data)[2]) {
+    data[, j] <- (data[, j]-mean(data[,j]))/sd(data[,j])
+  }
   data <- cbind(data, cluster_id)
   return(list(data, matMean, precMat))
 }
@@ -56,14 +59,14 @@ scattPlot2d <- function(res = NULL, data, diversity = FALSE) {
     div <- apply(res$Diversity, 2, mean)
     dfDiversity <- data.frame(x = data[,1], y = data[,2], diversity = div)
     plotEnt <- ggplot(data = dfDiversity, aes(x = x, y = y, color = diversity)) +
-      geom_point(size = 2) +
-      scale_color_gradient(low = "#001F3F", high = "#009E73") +
-      labs(title = "Two-dimensional Gaussian Finite Mixture", x = "V1", y = "V2")
+      geom_point(size = 4) + theme_minimal() +
+      scale_color_gradient(low = "#001F3F", high = "#ADD8E6") +
+      labs(title = "", x = expression(x), y = expression(y))
   } else {
     dfNDiversity <- data.frame(x = data[,1], y = data[,2])
     plotEnt <- ggplot(data = dfNDiversity, aes(x = x, y = y)) +
-      geom_point(color = "#001F3F", size = 2) +
-      labs(title = "Two-dimensional Gaussian Finite Mixture", x = "V1", y = "V2")
+      geom_point(color = "#001F3F", size = 4) +
+      labs(title = "", x = expression(x), y = expression(y)) + theme_minimal()
   }
   return(plotEnt)
 }
