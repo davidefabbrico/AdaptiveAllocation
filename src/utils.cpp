@@ -684,7 +684,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
                         double gamma, double q, double lambda, 
                         double kWeibull, double alphaPareto, 
                         double xmPareto, String DiversityIndex, 
-                        bool adaptive) {
+                        bool adaptive, double nSD, double lambda0,
+                        double zeta, double a) {
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -806,8 +807,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   double pS = 0.0;
   double pSSd = 0.0;
   double sds = ceil(sqrt((n/m)*K*(K-1)));
-  double s = ceil((n/m)*(K-1)) + sds;
-  double a = 100;
+  double s = ceil((n/m)*(K-1)) + nSD*sds;
   // Time 
   double durationOld;
   ////////////////////////////////////////////////////
@@ -835,13 +835,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     if (adaptive && t <= iterTuning) {
       DiversityIndex = "Exponential";
-      lambda = 40*pow(0.996, t) + 1; // 996
-      // if (t >= s) {
-      //   lambda = 1; // 30*pow(0.99, t) + 1; // 996
-      // } else {
-      //   lambda = 40*pow(0.99, t);
-      //   // DiversityIndex = "Entropy";
-      // }
+      lambda = lambda0*pow(zeta, t) + 1; // 996
     }
     NumericVector Diversity(n);
     if (DiversityIndex == "Generalized-Entropy") {
@@ -849,7 +843,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         for (int i = 0; i<n; i++) {
           for (int k = 0; k<K; k++) {
             if (probAllocation(i, k) == 0) {
-              Diversity(i) = Diversity(i) + 0; // define log(0) = 0 (by Paul's note)
+              Diversity(i) = Diversity(i) + 0; // define log(0) = 0
             } else {
               Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k)); 
             }
@@ -868,7 +862,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       if (q == 1) {
         for (int i = 0; i<n; i++) {
           if (probAllocation(i, z(i)) == 0.00) {
-            Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
+            Diversity(i) = 0; // define log(0) = 0
           } else {
             Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
           }
@@ -935,7 +929,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       //   gamma = 0.01;
       //   // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
       // }
-      alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+      alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
+      // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
       // double tmp;
       // if (t <= ceil((n*(K-1))/(m*K))) { // ceil(n/m)) {
       //   tmp = ceil((m*K*t)/(n*(K-1)));
