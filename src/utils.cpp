@@ -929,7 +929,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       //   gamma = 0.01;
       //   // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
       // }
-      alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
+      alpha = gamma*(alpha_prec*(t/(t+s))+(s/(t+s))*Diversity)+(1-gamma)*constVal;
+      // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
       // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
       // double tmp;
       // if (t <= ceil((n*(K-1))/(m*K))) { // ceil(n/m)) {
