@@ -119,8 +119,6 @@ arma::mat summary_Posterior(arma::imat z) {
     }
   }
   sumPost = sumPost/M;
-  // cout << "Somma per riga " << sum(sumPost, 0) << "\n";
-  // cout << "Somma per colonna " << sum(sumPost, 1) << "\n";
   return(sumPost);
 }
 
@@ -208,8 +206,6 @@ double ari(arma::irowvec eAlloc, arma::irowvec tAlloc) {
   double denPart1 = (numP2 + numP3)/2;
   double denPart2 = (numP2*numP3)/denden;
   double den = denPart1 - denPart2;
-  // cout << "Numeratore " << num << "\n";
-  // cout << "Denominatore " << den << "\n";
   return(num/den);
 }
 
@@ -657,21 +653,13 @@ double JS_distance(NumericVector p, NumericVector q) {
   int n = p.size();
   NumericVector D_KL_p(n);
   NumericVector D_KL_q(n);
-  // cout << "p " << p << "n";
-  // cout << "q " << q << "n";
   NumericVector meanDist = 0.5*(p+q);
-  // cout << "mean distance " << meanDist << "\n";
   for (int i = 0; i<n; i++) {
     D_KL_p(i) = p(i)*log2((p(i)/meanDist(i)) + 0.000001);
     D_KL_q(i) = q(i)*log2((q(i)/meanDist(i)) + 0.000001);
   }
-  // Levare gli NA
-  // cout << D_KL_p << "\n";
-  // cout << D_KL_q << "\n";
   double sum_D_KL_p = sum(D_KL_p);
   double sum_D_KL_q = sum(D_KL_q);
-  // cout << sum_D_KL_p << "\n";
-  // cout << sum_D_KL_q << "\n";
   double distance = 0.5 * (sum_D_KL_p + sum_D_KL_q);
   return(distance);
 }
@@ -909,48 +897,19 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     if (t == 0 || t == 1) {
       alpha = gamma*Diversity+(1-gamma)*constVal;
     } else {
-      // con exp ho problemi numerici faccio exp(iterazioni)
-      // alpha = alpha_prec*expup(t, s)+explo(t, s)*(gamma*Diversity+(1-gamma)*constVal);
-      // if (t >= s) {
-      //   alpha = constVal;
-      // } else {
-      //   alpha = alpha_prec*(t/(1.0+t))+(1.0/(1.0+t))*(gamma*Diversity+(1-gamma)*constVal);
-      // }
-      // if (t >= s) {
-      //   double tmp = t/2;
-      //   alpha = alpha_prec*(tmp/(1.0+tmp))+(1.0/(1.0+tmp))*(gamma*Diversity+(1-gamma)*constVal);
-      // } else {
-      //   alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
-      // }
-      // if (t % 10 == 0) {
-      //   // alpha = constVal;
-      //   gamma = 0.999;
-      // } else {
-      //   gamma = 0.01;
-      //   // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
-      // }
       alpha = gamma*(alpha_prec*(t/(t+s))+(s/(t+s))*Diversity)+(1-gamma)*constVal;
       // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
-      // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
-      // double tmp;
-      // if (t <= ceil((n*(K-1))/(m*K))) { // ceil(n/m)) {
-      //   tmp = ceil((m*K*t)/(n*(K-1)));
-      // } else {
-      //   // tmp = t/2;
-      //   tmp = t/((n*(K-1))/(m*K)*pow(0.99, t) + 1);
-      // }
-      // alpha = alpha_prec*(tmp/(1.0+tmp))+(1.0/(1.0+tmp))*(gamma*Diversity+(1-gamma)*constVal);
     }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // check the mean probability
-    if (adaptive) {
-      for (int i = 0; i<n; i++) {
-        probDiv(i) = probAllocation(i, z(i));
-      }
-      pSSd = sqrt(var(probDiv));
-      pS = mean(probDiv);
-    }
+    // if (adaptive) {
+    //   for (int i = 0; i<n; i++) {
+    //     probDiv(i) = probAllocation(i, z(i));
+    //   }
+    //   pSSd = sqrt(var(probDiv));
+    //   pS = mean(probDiv);
+    // }
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
@@ -1305,7 +1264,14 @@ List CRSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
 
 
 // [[Rcpp::export]]
-List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int burnin, int thin, double gamma, int q) {
+List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, 
+               int burnin, int iterTuning, 
+               int thin, int updateProbAlloc, String method, 
+               double gamma, double q, double lambda, 
+               double kWeibull, double alphaPareto, 
+               double xmPareto, String DiversityIndex, 
+               bool adaptive, double nSD, double lambda0,
+               double zeta, double a) {
   // start time
   // We suppose that R1 = R2 = ... = Rd
   auto start = std::chrono::high_resolution_clock::now();
@@ -1376,64 +1342,96 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
   arma::vec vecTmp(d);
+  double sds = ceil(sqrt((n/m)*K*(K-1)));
+  double s = ceil((n/m)*(K-1)) + nSD*sds;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
   for (int t = 0; t<iteration; t++) {
     // update probability
-    for (int i = 0; i<n; i++) {
-      for (int k = 0; k<K; k++) {
-        for (int j = 0; j<d; j++) {
-          // ATTENZIONE
-          vecTmp(j) = probCat.slice(k)(X(i,j), j);
+    if (t%updateProbAlloc == 0) {
+      for (int i = 0; i<n; i++) {
+        for (int k = 0; k<K; k++) {
+          for (int j = 0; j<d; j++) {
+            // ATTENZIONE
+            vecTmp(j) = probCat.slice(k)(X(i,j), j);
+          }
+          probAllocation(i,k) = pi(k)*myProduct(vecTmp);
         }
-        probAllocation(i,k) = pi(k)*myProduct(vecTmp);
+      }
+      // Normalize the rows
+      arma::vec rSum = rowSums(probAllocation);
+      for (int i = 0; i<n; i++) {
+        probAllocation(i, _) = probAllocation(i, _) / rSum(i);
       }
     }
-    // Normalize the rows
-    arma::vec rSum = rowSums(probAllocation);
-    for (int i = 0; i<n; i++) {
-      probAllocation(i, _) = probAllocation(i, _) / rSum(i);
+    if (adaptive && t <= iterTuning) {
+      DiversityIndex = "Exponential";
+      lambda = lambda0*pow(zeta, t) + 1; // 996
     }
     NumericVector Diversity(n);
-    // if (q == 1) {
-    //   for (int i = 0; i<n; i++) {
-    //     for (int k = 0; k<K; k++) {
-    //       Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k));
-    //     }
-    //     Diversity(i) = -Diversity(i);
-    //   }
-    // } else { 
-    //   for (int i = 0; i<n; i++) {
-    //     for (int k = 0; k<K; k++) {
-    //       if (probAllocation(i, k) == 0) {
-    //         Diversity(i) = Diversity(i) + 0;
-    //       } else {
-    //         Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
-    //       }
-    //     } 
-    //     Diversity(i) = (1-Diversity(i))/(q-1);
-    //   } 
-    // }
-    if (q == 1) {
-      for (int i = 0; i<n; i++) {
-        if (probAllocation(i, z(i)) == 0) {
-          Diversity(i) = 0; // define log(0) = 0 (by Paul's note)
-        } else {
-          Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+    if (DiversityIndex == "Generalized-Entropy") {
+      if (q == 1) {
+        for (int i = 0; i<n; i++) {
+          for (int k = 0; k<K; k++) {
+            if (probAllocation(i, k) == 0) {
+              Diversity(i) = Diversity(i) + 0; // define log(0) = 0
+            } else { 
+              Diversity(i) = Diversity(i) + probAllocation(i, k)*log2(probAllocation(i, k)); 
+            }
+          } 
+          Diversity(i) = -Diversity(i);
         } 
-        Diversity(i) = -Diversity(i);
+      } else {
+        for (int i = 0; i<n; i++) {
+          for (int k = 0; k<K; k++) {
+            Diversity(i) = Diversity(i) + pow(probAllocation(i, k), q);
+          } 
+          Diversity(i) = (1-Diversity(i))/(q-1);
+        } 
       } 
-    } else if (q == 0) {
+    } else if (DiversityIndex == "Partial-Generalized-Entropy") {
+      if (q == 1) {
+        for (int i = 0; i<n; i++) {
+          if (probAllocation(i, z(i)) == 0.00) {
+            Diversity(i) = 0; // define log(0) = 0
+          } else { 
+            Diversity(i) = probAllocation(i, z(i))*log2(probAllocation(i, z(i))); 
+          } 
+          Diversity(i) = -Diversity(i);
+        } 
+      } else if (q == 0) {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = 1 - probAllocation(i, z(i));
+        } 
+      } else {
+        for (int i = 0; i<n; i++) {
+          Diversity(i) = pow(probAllocation(i, z(i)), q);
+        } 
+        Diversity = (1-Diversity)/(q-1);
+      }
+    } else if (DiversityIndex == "Exponential") {
       for (int i = 0; i<n; i++) {
-        Diversity(i) = 1 - probAllocation(i, z(i));
+        // Exponetial
+        Diversity(i) = lambda*exp(-lambda*probAllocation(i, z(i)));
       } 
-    } else {
+    } else if (DiversityIndex == "Pareto") {
       for (int i = 0; i<n; i++) {
-        Diversity(i) = pow(probAllocation(i, z(i)), q);
-      } 
-      Diversity = (1-Diversity)/(q-1);
+        // Pareto
+        Diversity(i) = (alphaPareto*pow(xmPareto, alphaPareto))/pow(probAllocation(i, z(i))+0.00001, alphaPareto + 1);
+      }
     } 
+    else if (DiversityIndex == "Weibull") {
+      for (int i = 0; i<n; i++) {
+        // Weibull
+        Diversity(i) = (kWeibull/lambda)*pow(probAllocation(i, z(i)), kWeibull-1)*exp(-pow(probAllocation(i, z(i)/lambda), kWeibull));
+      } 
+    } else if (DiversityIndex == "Hyperbole") {
+      for (int i = 0; i<n; i++) {
+        // Hyperbole
+        Diversity(i) = pow(1/(probAllocation(i, z(i)) + 0.0001), lambda);
+      } 
+    }
     // Normalize
     double sumDiv = sum(Diversity);
     for (int i = 0; i<n; i++) {
@@ -1442,10 +1440,12 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
     // update alpha
     if (t == 0 || t == 1) {
       alpha = gamma*Diversity+(1-gamma)*constVal;
-    } else {
-      alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*(gamma*Diversity+(1-gamma)*constVal);
-      // alpha = alpha_prec*((t-1.0)/t)+(1.0/t)*alpha_custom;
+    } else { 
+      alpha = gamma*(alpha_prec*(t/(t+s))+(s/(t+s))*Diversity)+(1-gamma)*constVal;
+      // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
     } 
+    // sample according to alpha
+    rI = csample_num(indI, m, false, alpha); 
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // update z
@@ -1490,7 +1490,7 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration, int 
       PROBCAT[idx] = probCat;
       idx = idx + 1;
     } 
-    if (t%1000 == 0 && t > 0) {
+    if (t%5000 == 0 && t > 0) {
       std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
     } 
   }
