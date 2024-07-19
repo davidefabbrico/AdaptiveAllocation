@@ -894,8 +894,16 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       Diversity(i) = (Diversity(i) / sumDiv);
     }
     // update alpha
-    alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+    // old one
+    // alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+    // new one
+    alpha = gamma*(alpha_prec*(t/(t+s))+(s/(t+s))*Diversity)+(1-gamma)*constVal;
     // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
+    // Normalize the alpha vector
+    // double sumAlp = sum(alpha);
+    // for (int i = 0; i<n; i++) {
+    //   alpha(i) = (alpha(i) / sumAlp);
+    // }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // check the mean probability
