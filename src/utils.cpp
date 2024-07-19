@@ -894,12 +894,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       Diversity(i) = (Diversity(i) / sumDiv);
     }
     // update alpha
-    if (t == 0 || t == 1) {
-      alpha = gamma*Diversity+(1-gamma)*constVal;
-    } else {
-      alpha = gamma*(alpha_prec*(t/(t+s))+(s/(t+s))*Diversity)+(1-gamma)*constVal;
-      // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
-    }
+    alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+    // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha);
     // check the mean probability
@@ -1471,7 +1467,6 @@ List CDSG(arma::mat X, arma::vec hyper, int K, int R, int m, int iteration,
     // update pi
     arma::rowvec parDirich = concPar.t() + N;
     pi = rdirichlet_cpp(1, parDirich.t());
-    // update category probability
     // update category probability
     for (int j = 0; j<d; j++) {
       for (int k = 0; k<K; k++) {
