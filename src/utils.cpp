@@ -673,7 +673,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
                         double kWeibull, double alphaPareto, 
                         double xmPareto, String DiversityIndex, 
                         bool adaptive, double nSD, double lambda0,
-                        double zeta, double a) {
+                        double zeta, double a, String w_fun) {
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -788,6 +788,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   NumericMatrix probAllocation(n, K);
   // alpha weight 
   NumericVector alpha(n);
+  NumericVector alpha_norm(n);
   NumericVector alpha_prec(n);
   NumericVector alpha_custom(n);
   // adaptive diversity function
@@ -889,23 +890,35 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       }
     }
     // Normalize
-    double sumDiv = sum(Diversity);
-    for (int i = 0; i<n; i++) {
-      Diversity(i) = (Diversity(i) / sumDiv);
-    }
+    // double sumDiv = sum(Diversity);
+    // for (int i = 0; i<n; i++) {
+    //   Diversity(i) = (Diversity(i) / sumDiv);
+    // }
     // update alpha
     // old one
     // alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
     // new one
-    alpha = gamma*(alpha_prec*(t/(t+s))+(s/(t+s))*Diversity)+(1-gamma)*constVal;
+    if (w_fun == "hyperbolic") {
+      if (t == 0) {
+        alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+      } else {
+        alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+      }
+    } else if (w_fun == "polynomial") {
+      if (t == 0) {
+        alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+      } else {
+        alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+      }
+    }
     // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
     // Normalize the alpha vector
-    // double sumAlp = sum(alpha);
-    // for (int i = 0; i<n; i++) {
-    //   alpha(i) = (alpha(i) / sumAlp);
-    // }
+    double sumAlpha = sum(alpha);
+    for (int i = 0; i<n; i++) {
+      alpha_norm(i) = (alpha(i) / sumAlpha);
+    }
     // sample according to alpha
-    rI = csample_num(indI, m, false, alpha);
+    rI = csample_num(indI, m, false, alpha_norm);
     // check the mean probability
     // if (adaptive) {
     //   for (int i = 0; i<n; i++) {
