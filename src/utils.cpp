@@ -251,6 +251,8 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   }
   // Z
   arma::imat Z(nout, n);
+  // Probability allocation
+  List PROB(nout);
   // TIME
   NumericVector TIME(nout);
   // PI
@@ -414,6 +416,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
       Z.row(idx) = z;
       PI.row(idx) = pi;
       TIME[idx] = duration;
+      PROB[idx] = probAllocation;
       MU[idx] = mu;
       PREC[idx] = prec;
       idx = idx + 1;
@@ -424,6 +427,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   }
   std::cout << "End MCMC!\n";
   return List::create(Named("Allocation") = Z,
+                      Named("Probability") = PROB,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,
                       Named("Precision") = PREC,
@@ -673,7 +677,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
                         double kWeibull, double alphaPareto, 
                         double xmPareto, String DiversityIndex, 
                         bool adaptive, double nSD, double lambda0,
-                        double zeta, double a, String w_fun) {
+                        double zeta, double a, String w_fun, int sp) {
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -897,6 +901,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     // update alpha
     // old one
     // alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+    if (sp != 0) {
+      if (t <= sp) {
+        w_fun = "hyperbolic";
+      } else {
+        w_fun = "polynomial";
+      }
+    }
     // new one
     if (w_fun == "hyperbolic") {
       if (t == 0) {
