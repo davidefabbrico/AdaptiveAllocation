@@ -11,27 +11,6 @@ using namespace Rcpp;
 using namespace arma;
 using namespace std;
 
-// TODO
-// [X] data in d-dimension
-// [X] How to set the Hyperparameters?
-// From Bayesian Regularization for Normal Mixture Estimation and Model-Based Clustering 
-// by Fraley and Raftery page 159-160. We have 4 more hyperparameters:
-// 1. mu ~ N(muP, sigma^2/kP)
-// 2. 1/sigma^2 ~ G(vP^2/2, zetaP^2/2) !!!!is conditional!!!.
-// for the mean the mean of the data. kP = 0.01
-// vP = d+2, zetaP = sum(diag(var(data))/d/G^(2/d), where G number of component
-// [X] Random Gibbs sampler
-// [X] Entropy-Giuded Adaptive Gibbs sampler
-// [X] Check the generating mechanism
-// [X] Plot with entropy
-// Emphasise the color
-// [X] How to summarize the posterior? (in C++)
-// [X] Categorical Data
-// [X] Check the full conditional with the new Regularization
-// [X] Evaluate Convergence
-// [ ] Code Optimization
-// [X] How many time I need to update the Prob Allocation Matrix?
-
 // Modello:
 // xi | zi, mu, sigma^2 è una normale , da cui R::rnorm(0, 1)
 // zi | pi1, ..., piK è una Multinomiale, da cui non sappiamo ancora campionare
@@ -874,7 +853,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     } else if (DiversityIndex == "Exponential") {
       for (int i = 0; i<n; i++) {
         // Exponetial
-        Diversity(i) = lambda*exp(-lambda*probAllocation(i, z(i)));
+        // Diversity(i) = lambda*exp(-lambda*probAllocation(i, z(i)));
+        Diversity(i) = (lambda*exp(-lambda*probAllocation(i, z(i))))/(1-exp(-lambda));
       }
     } else if (DiversityIndex == "Pareto") {
       for (int i = 0; i<n; i++) {
@@ -905,6 +885,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       if (t <= sp) {
         w_fun = "hyperbolic";
       } else {
+        s = 1;
         w_fun = "polynomial";
       }
     }

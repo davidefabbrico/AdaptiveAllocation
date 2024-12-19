@@ -241,8 +241,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // DiversityGibbsSamp
-List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int iterTuning, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive, double nSD, double lambda0, double zeta, double a, String w_fun);
-RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP iterTuningSEXP, SEXP thinSEXP, SEXP updateProbAllocSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP qSEXP, SEXP lambdaSEXP, SEXP kWeibullSEXP, SEXP alphaParetoSEXP, SEXP xmParetoSEXP, SEXP DiversityIndexSEXP, SEXP adaptiveSEXP, SEXP nSDSEXP, SEXP lambda0SEXP, SEXP zetaSEXP, SEXP aSEXP, SEXP w_funSEXP) {
+List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, double m, int iteration, int burnin, int iterTuning, int thin, int updateProbAlloc, String method, double gamma, double q, double lambda, double kWeibull, double alphaPareto, double xmPareto, String DiversityIndex, bool adaptive, double nSD, double lambda0, double zeta, double a, String w_fun, int sp);
+RcppExport SEXP _AdaptiveAllocation_DiversityGibbsSamp(SEXP XSEXP, SEXP hyperSEXP, SEXP KSEXP, SEXP mSEXP, SEXP iterationSEXP, SEXP burninSEXP, SEXP iterTuningSEXP, SEXP thinSEXP, SEXP updateProbAllocSEXP, SEXP methodSEXP, SEXP gammaSEXP, SEXP qSEXP, SEXP lambdaSEXP, SEXP kWeibullSEXP, SEXP alphaParetoSEXP, SEXP xmParetoSEXP, SEXP DiversityIndexSEXP, SEXP adaptiveSEXP, SEXP nSDSEXP, SEXP lambda0SEXP, SEXP zetaSEXP, SEXP aSEXP, SEXP w_funSEXP, SEXP spSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -269,7 +269,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type zeta(zetaSEXP);
     Rcpp::traits::input_parameter< double >::type a(aSEXP);
     Rcpp::traits::input_parameter< String >::type w_fun(w_funSEXP);
-    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a, w_fun));
+    Rcpp::traits::input_parameter< int >::type sp(spSEXP);
+    rcpp_result_gen = Rcpp::wrap(DiversityGibbsSamp(X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a, w_fun, sp));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -361,7 +362,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_AdaptiveAllocation_SSG", (DL_FUNC) &_AdaptiveAllocation_SSG, 8},
     {"_AdaptiveAllocation_RSSG", (DL_FUNC) &_AdaptiveAllocation_RSSG, 8},
     {"_AdaptiveAllocation_JS_distance", (DL_FUNC) &_AdaptiveAllocation_JS_distance, 2},
-    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 23},
+    {"_AdaptiveAllocation_DiversityGibbsSamp", (DL_FUNC) &_AdaptiveAllocation_DiversityGibbsSamp, 24},
     {"_AdaptiveAllocation_CSSG", (DL_FUNC) &_AdaptiveAllocation_CSSG, 7},
     {"_AdaptiveAllocation_CRSG", (DL_FUNC) &_AdaptiveAllocation_CRSG, 8},
     {"_AdaptiveAllocation_CDSG", (DL_FUNC) &_AdaptiveAllocation_CDSG, 23},

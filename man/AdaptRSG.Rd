@@ -27,7 +27,8 @@ AdaptRSG(
   lambda0 = 40,
   zeta = 0.996,
   a = 100,
-  w_fun = "hyperbolic"
+  w_fun = "hyperbolic",
+  sp = 0
 )
 }
 \description{

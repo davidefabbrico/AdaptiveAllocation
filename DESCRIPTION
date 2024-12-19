@@ -9,5 +9,5 @@ Description: One paragraph description of what the package does as one or more f
 License: License: GPL-3 + file LICENSE
 Imports: Rcpp (>= 1.0.12), mltools, MASS, ggplot2, stats, RColorBrewer, MCMCpack, mclust, pheatmap
 LinkingTo: Rcpp, RcppArmadillo
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Encoding: UTF-8

@@ -48,9 +48,15 @@ d <- 30  # dimension
 K <- 10 # cluster
 data <- AdaptiveAllocation::genGaussianGM(n = n, d = d, K = K)
 # MCMC settings
+gamma <- 0.99
+m <- 5
+nSD <- 1 # number of standard deviation
 iter <- 1000
 burnin <- 0
 thin <- 1
 # run the Adaptive MCMC
-res <- DiversityGibbs(X = data[[1]][, 1:d], K = K, iteration = iter, burnin = burnin, 
-                      thin = thin, DiversityIndex = "Laplace", q = 5, method = "EB")
+myRes <- AdaptRSG(data[[1]][, 1:d], K = K, m = m, iteration = iter, iterTuning = iter,
+                    burnin = 0, thin = thin, gamma = gamma, q = 1,
+                    method = "EB", hyper = c(1, 1, 0, 1, 1, 1), adaptive = T,
+                    DiversityIndex = "Exponential", lambda = 2, updateProbAllocation = ceiling(m*gamma),
+                    lambda0 = 30, zeta = 0.997, a = 1, nSD = nSD, w_fun = "hyperbolic", sp = 0)
