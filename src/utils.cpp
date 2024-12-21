@@ -885,7 +885,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       if (t <= sp) {
         w_fun = "hyperbolic";
       } else {
-        s = 1;
         w_fun = "polynomial";
       }
     }
@@ -897,10 +896,19 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
       }
     } else if (w_fun == "polynomial") {
-      if (t == 0) {
-        alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+      if (sp == 0) {
+        if (t == 0) {
+          alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+        } else {
+          alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+        }
       } else {
-        alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+        s = 1;
+        if (t == 0) {
+          alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+        } else {
+          alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+s))*(gamma*Diversity+(1-gamma)*constVal);
+        }
       }
     }
     // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
