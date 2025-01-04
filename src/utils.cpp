@@ -907,7 +907,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         if (t == 0) {
           alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
         } else {
-          alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+s))*(gamma*Diversity+(1-gamma)*constVal);
+          alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+1+s))*(gamma*Diversity+(1-gamma)*constVal);
         }
       }
     }
