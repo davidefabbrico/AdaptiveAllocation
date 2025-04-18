@@ -213,7 +213,9 @@ double mySum(arma::vec a) {
 ///////////////////////////////////////////////////
 
 // [[Rcpp::export]]
-List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thin, String method, bool trueAll) {
+List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, 
+         int thin, String method, arma::irowvec trueAll, int seed) {
+  arma::arma_rng::set_seed(seed);
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -270,11 +272,9 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
   NumericVector probC(K);
   for (int k = 0; k<K; k++) {
     probC(k) = hyper(0)/K;
-  } 
-  if (trueAll) {
-    for (int k = 0; k < K; k++) {
-      z.subvec(k * (n/K), (k+1) * (n/K) - 1).fill(k);
-    }
+  }
+  if (arma::sum(trueAll) > 0) {
+    z = trueAll;
   } else {
     for (int i = 0; i<n; i++) {
       z(i) = csample_num(indC, 1, true, probC)(0);
@@ -421,7 +421,9 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, int thi
 
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
-List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, int burnin, int thin, String method) {
+List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, 
+          int burnin, int thin, String method, int seed) {
+  arma::arma_rng::set_seed(seed);
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -652,11 +654,13 @@ double JS_distance(NumericVector p, NumericVector q) {
 List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, 
                         double m, int iteration, int burnin, int iterTuning, 
                         int thin, int updateProbAlloc, String method, 
-                        double gamma, double q, double lambda, 
+                        double q, double lambda, 
                         double kWeibull, double alphaPareto, 
                         double xmPareto, String DiversityIndex, 
-                        bool adaptive, double nSD, double lambda0,
-                        double zeta, double a, String w_fun, int sp) {
+                        bool adaptive, double nSD, double Gamma,
+                        double a, String w_fun, int sp,
+                        int seed) {
+  arma::arma_rng::set_seed(seed);
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -677,6 +681,11 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   NumericVector constVal(n);
   for (int i = 0; i<n; i++) {
     constVal(i) = 1.0/n;
+  }
+  // ones vector
+  NumericVector OnesVal(n);
+  for (int i = 0; i<n; i++) {
+    OnesVal(i) = 1.0;
   }
   int idx = 0;
   // TIME 
@@ -779,15 +788,32 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   double pS = 0.0;
   double pSSd = 0.0;
   double sds = ceil(sqrt((n/m)*K*(K-1)));
-  double s = ceil((n/m)*(K-1)) + nSD*sds;
+  double s = ceil((n/m)*(K-1) + nSD*sds);
   // Time 
   double durationOld;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
+  // Per l'aggiornamento della matrice di allocazione si divide la 
+  // catena in 3 parti. Prima la dividiamo in due, quindi 50%, nella 
+  // prima metà la spezziamo in due, dove nella prima parte aggiorniamo 
+  // la matrice ogni 2 iterazioni, nella seconda ogni 5 iterazioni. 
+  // Nella seconda metà aggiorniamo la matrice ogni 10 iterazioni.
+  // preconditioning MH
   for (int t = 0; t<iteration; t++) {
     // start time
     auto start = std::chrono::high_resolution_clock::now();
+    // schedule for updating the probability allocation matrix
+    if (updateProbAlloc == 0) {
+      // 1-5-10, 3-6-10, 5-8-10, 7-10-15, 10-15-20
+      if (t <= ceil(iteration/4)) {
+        updateProbAlloc = 3;
+      } else if (t > ceil(iteration/4) && t <= ceil(iteration/2)) {
+        updateProbAlloc = 6; 
+      } else {
+        updateProbAlloc = 10;
+      }
+    }
     // update probability
     if (t%updateProbAlloc == 0) {
       for (int i = 0; i<n; i++) {
@@ -807,7 +833,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     if (adaptive && t <= iterTuning) {
       DiversityIndex = "Exponential";
-      lambda = lambda0*pow(zeta, t) + 1; // 996
+      // lambda = lambda0*pow(zeta, t) + 1;
+      lambda = 1 + (Gamma - 1)*(1-(t/(Gamma+t)));
     }
     NumericVector Diversity(n);
     if (DiversityIndex == "Generalized-Entropy") {
@@ -854,6 +881,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       for (int i = 0; i<n; i++) {
         // Exponetial
         // Diversity(i) = lambda*exp(-lambda*probAllocation(i, z(i)));
+        // Truncated Exponential
         Diversity(i) = (lambda*exp(-lambda*probAllocation(i, z(i))))/(1-exp(-lambda));
       }
     } else if (DiversityIndex == "Pareto") {
@@ -879,8 +907,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     //   Diversity(i) = (Diversity(i) / sumDiv);
     // }
     // update alpha
-    // old one
-    // alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
     if (sp != 0) {
       if (t <= sp) {
         w_fun = "hyperbolic";
@@ -893,21 +919,24 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       if (t == 0) {
         alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
       } else {
-        alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+        // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
+        alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity;
       }
     } else if (w_fun == "polynomial") {
       if (sp == 0) {
         if (t == 0) {
           alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
         } else {
-          alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+          // alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
+          alpha = alpha_prec*(t/(t+s))+(s/(t+s))*Diversity;
         }
       } else {
         s = 1;
         if (t == 0) {
           alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
         } else {
-          alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+1+s))*(gamma*Diversity+(1-gamma)*constVal);
+          // alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+1+s))*(gamma*Diversity+(1-gamma)*constVal);
+          alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+1+s))*Diversity;
         }
       }
     }
@@ -919,6 +948,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha_norm);
+    // rI = csample_num(indI, m, false, alpha);
     // check the mean probability
     // if (adaptive) {
     //   for (int i = 0; i<n; i++) {
