@@ -5,7 +5,20 @@
 #include <stdlib.h> 
 #include <limits.h>
 #include <chrono>
+#include <algorithm>
 #include <RcppArmadilloExtensions/sample.h>
+
+#define ANSI_RESET       "\033[0m"
+#define ANSI_BOLD        "\033[1m"
+#define ANSI_WHITE       "\033[97m"
+#define ANSI_RED         "\033[31m"
+#define ANSI_GREEN       "\033[32m"
+#define ANSI_YELLOW      "\033[33m"
+#define ANSI_BG_GREEN    "\033[42m"
+#define ANSI_BG_YELLOW   "\033[43m"
+#define ANSI_BG_CYAN     "\033[46m"
+#define ANSI_BRIGHT_RED  "\033[91m"
+#define ANSI_BRIGHT_GREEN "\033[92m"
 
 using namespace Rcpp;
 using namespace arma;
@@ -215,9 +228,13 @@ double mySum(arma::vec a) {
 // [[Rcpp::export]]
 List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, 
          int thin, String method, arma::irowvec trueAll, int seed) {
+  // All the seed
   arma::arma_rng::set_seed(seed);
+  Rcpp::Environment base_env = Rcpp::Environment::namespace_env("base");
+  Rcpp::Function set_seed_r = base_env["set.seed"];
+  set_seed_r(seed);
+  std::srand(seed);
   // precision and not variance!!
-  // m: how many observation I want to update
   ////////////////////////////////////////////////////
   ////////////////// Initial settings ///////////////
   ///////////////////////////////////////////////////
@@ -278,7 +295,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
   } else {
     for (int i = 0; i<n; i++) {
       z(i) = csample_num(indC, 1, true, probC)(0);
-    } 
+    }
   }
   // PI
   arma::rowvec pi(K);
@@ -424,6 +441,10 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
 List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, 
           int burnin, int thin, String method, int seed) {
   arma::arma_rng::set_seed(seed);
+  Rcpp::Environment base_env = Rcpp::Environment::namespace_env("base");
+  Rcpp::Function set_seed_r = base_env["set.seed"];
+  set_seed_r(seed);
+  std::srand(seed);
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -650,17 +671,117 @@ double JS_distance(NumericVector p, NumericVector q) {
 }
 
 
+double myRound(double x) {
+  double out = round(x*1000.0) / 1000.0;
+  return(out);
+}
+
+double custom_quantile(NumericVector data, double p) {
+  if(data.size() == 0 || p < 0.0 || p > 1.0) 
+    return NA_REAL;
+  NumericVector sorted = clone(data).sort();
+  int n = sorted.size();
+  double h = (n - 1)*p + 1;
+  int k = static_cast<int>(h);
+  double fraction = h - k;
+  if(k >= n - 1) {
+    return sorted[n - 1];
+  } else {
+    return (1.0 - fraction)*sorted[k - 1] + fraction*sorted[k];
+  }
+}
+
+double find_lambda(const arma::vec& pi, double m_target, double max_lambda, double lambda_init = 1.0, double tol = 1e-6, int max_iter = 100) {
+  double lambda = std::clamp(lambda_init, 1.0, max_lambda);
+  double ESS = 0.0;
+  
+  for(int i = 0; i < max_iter; ++i) {
+    arma::vec a = -lambda * pi;
+    double m1 = arma::max(a);
+    arma::vec exp_a = arma::exp(a - m1);
+    double log_S1 = m1 + std::log(arma::sum(exp_a));
+     
+    arma::vec b = -2.0 * lambda * pi;
+    double m2 = arma::max(b);
+    arma::vec exp_b = arma::exp(b - m2);
+    double log_S2 = m2 + std::log(arma::sum(exp_b));
+     
+    ESS = std::exp(2 * log_S1 - log_S2);
+     
+    double sum_pi_exp_a = arma::dot(pi, exp_a) * std::exp(m1);
+    double sum_pi_exp_b = arma::dot(pi, exp_b) * std::exp(m2);
+     
+    double dS1_dlambda = -sum_pi_exp_a;
+    double dS2_dlambda = -2.0 * sum_pi_exp_b;
+     
+    double numerator = 2.0 * std::exp(2 * log_S1 - log_S2) * dS1_dlambda - ESS * dS2_dlambda;
+    double denominator = std::exp(2 * log_S2);
+    double dESS_dlambda = numerator / denominator;
+     
+    double h = ESS - m_target;
+     
+    if (std::abs(dESS_dlambda) < 1e-10 || !std::isfinite(dESS_dlambda)) break;
+     
+    double delta = h / dESS_dlambda;
+    double lambda_new = std::clamp(lambda - delta, 1.0, max_lambda);
+     
+    if (std::abs(lambda_new - lambda) < tol) {
+      lambda = lambda_new;
+      break;
+    }
+    
+    lambda = lambda_new;
+  }
+  
+  return lambda;
+  
+  // provare ad utilizzare long double
+} 
+
+double sma(
+    const arma::vec& x, 
+    int L,              
+    double lambda_hat   
+) {
+
+  if (L <= 0) {
+    return std::max(lambda_hat, 1.0);
+  }
+  
+  arma::uvec non_zero_indices = arma::find(x != 0.0);
+  int count_non_zero = non_zero_indices.n_elem;
+   
+  int take = std::min(L - 1, count_non_zero);
+   
+  double sum_x = 0.0;
+  if (take > 0) {
+    int start_idx = std::max(0, count_non_zero - take);
+    arma::uvec selected_indices = non_zero_indices.subvec(start_idx, count_non_zero - 1);
+    sum_x = arma::sum(x.elem(selected_indices));
+  }
+   
+  int denominator = take + 1;
+   
+  double average = (sum_x + lambda_hat) / denominator;
+  return std::max(average, 1.0);
+}
+
+
 // [[Rcpp::export]]
 List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, 
-                        double m, int iteration, int burnin, int iterTuning, 
+                        double m, int iteration, int burnin, 
                         int thin, int updateProbAlloc, String method, 
-                        double q, double lambda, 
+                        double q, double lambda,
                         double kWeibull, double alphaPareto, 
                         double xmPareto, String DiversityIndex, 
-                        bool adaptive, double nSD, double Gamma,
-                        double a, String w_fun, int sp,
+                        bool adaptive, double nSD, double lambda0,
+                        int L, double max_lambda, double c, double a, String w_fun, int sp,
                         int seed) {
   arma::arma_rng::set_seed(seed);
+  Rcpp::Environment base_env = Rcpp::Environment::namespace_env("base");
+  Rcpp::Function set_seed_r = base_env["set.seed"];
+  set_seed_r(seed);
+  std::srand(seed);
   // precision and not variance!!
   // m: how many observation I want to update
   ////////////////////////////////////////////////////
@@ -696,12 +817,10 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   NumericVector PAR(nout);
   // Probability allocation
   List PROB(nout);
-  // Diversity Probability
-  NumericVector PDIV(nout);
-  // Diversity Probability Standard Deviation
-  NumericVector PSD(nout);
   // ALPHA
   NumericMatrix ALPHA(nout, n);
+  // Probability Distribution
+  NumericMatrix PDIST(nout, n);
   // PI
   arma::mat PI(nout, K);
   // Entropy
@@ -710,6 +829,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   List MU(nout);
   // SIGMA
   List PREC(nout);
+  // LAMBDA WARNING
+  NumericVector EST_LAMBDA(nout);
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -735,6 +856,10 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   if (q < 0) {
     cout << "q should be greater or equal to 0!" << "\n";
   }
+  // Progress bar setup
+  int barWidth = 30;
+  double progress = 0.0;
+  auto overall_start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -784,9 +909,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   NumericVector alpha_prec(n);
   NumericVector alpha_custom(n);
   // adaptive diversity function
-  arma::vec probDiv(n);
-  double pS = 0.0;
-  double pSSd = 0.0;
+  int updateLambda = 1;
+  NumericVector probDiv(n);
+  double lambda_est;
   double sds = ceil(sqrt((n/m)*K*(K-1)));
   double s = ceil((n/m)*(K-1) + nSD*sds);
   // Time 
@@ -794,12 +919,12 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
-  // Per l'aggiornamento della matrice di allocazione si divide la 
-  // catena in 3 parti. Prima la dividiamo in due, quindi 50%, nella 
-  // prima metà la spezziamo in due, dove nella prima parte aggiorniamo 
-  // la matrice ogni 2 iterazioni, nella seconda ogni 5 iterazioni. 
-  // Nella seconda metà aggiorniamo la matrice ogni 10 iterazioni.
-  // preconditioning MH
+  // To update the allocation matrix, the chain is divided into 3 segments:  
+  // 1. First, split the chain into two equal halves (50% each)  
+  // 2. Split the first half into two sub-segments:  
+  //    - First sub-segment: Update matrix every 3 iterations  
+  //    - Second sub-segment: Update matrix every 6 iterations  
+  // 3. In the second half: Update matrix every 10 iterations  
   for (int t = 0; t<iteration; t++) {
     // start time
     auto start = std::chrono::high_resolution_clock::now();
@@ -808,10 +933,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       // 1-5-10, 3-6-10, 5-8-10, 7-10-15, 10-15-20
       if (t <= ceil(iteration/4)) {
         updateProbAlloc = 3;
+        if (lambda0 == 0) {updateLambda = 3;}
       } else if (t > ceil(iteration/4) && t <= ceil(iteration/2)) {
         updateProbAlloc = 6; 
+        if (lambda0 == 0) {updateLambda = 6;}
       } else {
         updateProbAlloc = 10;
+        if (lambda0 == 0) {updateLambda = 10;}
       }
     }
     // update probability
@@ -831,10 +959,25 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         probAllocation(i, _) = probAllocation(i, _) / rSum(i);
       }
     }
-    if (adaptive && t <= iterTuning) {
+    if (adaptive) {
+      for (int i = 0; i<n; i++) {
+        probDiv(i) = probAllocation(i, z(i));
+      }
+      // pSSd = sqrt(var(probDiv));
+      // pS = mean(probDiv);
       DiversityIndex = "Exponential";
-      // lambda = lambda0*pow(zeta, t) + 1;
-      lambda = 1 + (Gamma - 1)*(1-(t/(Gamma+t)));
+      if (t > sp) {
+        lambda = 1;
+      } else {
+        if (lambda0 == 0) {
+          if (t%updateLambda == 0) {
+            lambda_est = find_lambda(probDiv, c*m, max_lambda);
+          }
+          lambda = sma(PAR, L, lambda_est);
+        } else {
+          lambda = lambda0;
+        }
+      }
     }
     NumericVector Diversity(n);
     if (DiversityIndex == "Generalized-Entropy") {
@@ -880,9 +1023,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     } else if (DiversityIndex == "Exponential") {
       for (int i = 0; i<n; i++) {
         // Exponetial
-        // Diversity(i) = lambda*exp(-lambda*probAllocation(i, z(i)));
-        // Truncated Exponential
-        Diversity(i) = (lambda*exp(-lambda*probAllocation(i, z(i))))/(1-exp(-lambda));
+        Diversity(i) = exp(-lambda*probAllocation(i, z(i)));
       }
     } else if (DiversityIndex == "Pareto") {
       for (int i = 0; i<n; i++) {
@@ -901,12 +1042,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         Diversity(i) = pow(1/(probAllocation(i, z(i)) + 0.0001), lambda);
       }
     }
-    // Normalize
-    // double sumDiv = sum(Diversity);
-    // for (int i = 0; i<n; i++) {
-    //   Diversity(i) = (Diversity(i) / sumDiv);
-    // }
-    // update alpha
     if (sp != 0) {
       if (t <= sp) {
         w_fun = "hyperbolic";
@@ -914,33 +1049,28 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         w_fun = "polynomial";
       }
     }
-    // new one
     if (w_fun == "hyperbolic") {
       if (t == 0) {
-        alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+        alpha = constVal;
       } else {
-        // alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*(gamma*Diversity+(1-gamma)*constVal);
         alpha = alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity;
       }
     } else if (w_fun == "polynomial") {
       if (sp == 0) {
         if (t == 0) {
-          alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+          alpha = constVal;
         } else {
-          // alpha = alpha_prec*(t/(t+s))+(s/(t+s))*(gamma*Diversity+(1-gamma)*constVal);
           alpha = alpha_prec*(t/(t+s))+(s/(t+s))*Diversity;
         }
       } else {
         s = 1;
         if (t == 0) {
-          alpha = constVal; // gamma*Diversity+(1-gamma)*constVal;
+          alpha = constVal;
         } else {
-          // alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+1+s))*(gamma*Diversity+(1-gamma)*constVal);
           alpha = alpha_prec*((t-sp+1)/(t-sp+1+s))+(s/(t-sp+1+s))*Diversity;
         }
       }
     }
-    // alpha = gamma*(alpha_prec*tanup(t, s, a)+tanlo(t, s, a)*Diversity)+(1-gamma)*constVal;
     // Normalize the alpha vector
     double sumAlpha = sum(alpha);
     for (int i = 0; i<n; i++) {
@@ -948,15 +1078,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     // sample according to alpha
     rI = csample_num(indI, m, false, alpha_norm);
-    // rI = csample_num(indI, m, false, alpha);
-    // check the mean probability
-    // if (adaptive) {
-    //   for (int i = 0; i<n; i++) {
-    //     probDiv(i) = probAllocation(i, z(i));
-    //   }
-    //   pSSd = sqrt(var(probDiv));
-    //   pS = mean(probDiv);
-    // }
     // update z
     for (int i = 0; i<m; i++) {
       z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
@@ -975,7 +1096,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     double muPost;
     double precPost;
     arma::mat sampMean(K, d);
-    // Prior Setting (tutti i cluster partono con la stessa hyperpriori per la media)
+    // Prior Setting
     for (int k = 0; k<K; k++) {
       for (int j = 0; j<d; j++) {
         for (int i = 0; i<n; i++) {
@@ -1007,6 +1128,58 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       }
     }
     alpha_prec = alpha;
+    
+    ////////////////////////////////////////////////////
+    ///////////////// Progress Reporting ///////////////
+    ////////////////////////////////////////////////////
+    if (t % 100 == 0 || t == iteration - 1) {
+      // Calculate progress and time estimates
+      progress = static_cast<double>(t + 1) / iteration;
+      auto now = std::chrono::high_resolution_clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - overall_start).count();
+      double remaining = elapsed / progress * (1 - progress);
+      
+      // Progress bar
+      Rcpp::Rcout << "[";
+      int pos = barWidth * progress;
+      for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) Rcpp::Rcout << "=";
+        else if (i == pos) Rcpp::Rcout << ">";
+        else Rcpp::Rcout << " ";
+      }
+      
+      // Display information
+      bool is_adapting = t < sp;  // Soglia per adattamento parametri
+      
+      if (is_adapting) {
+        // Messaggio di adattamento attivo
+        Rcpp::Rcout << ANSI_BOLD << ANSI_BG_YELLOW << ANSI_WHITE << " ADAPTING λ " << ANSI_RESET << " ";
+      } else { 
+        // Messaggio di adattamento disattivato
+        Rcpp::Rcout << ANSI_BOLD << ANSI_BG_CYAN << ANSI_WHITE << " FIXED λ " << ANSI_RESET << " ";
+      }
+       
+      if (t == iteration - 1) {
+        // Messaggio di completamento
+        Rcpp::Rcout << ANSI_BOLD << ANSI_BRIGHT_GREEN << "✓ " 
+                    << ANSI_BG_GREEN << ANSI_WHITE << "COMPLETED" << ANSI_RESET << " "
+                    << ANSI_BOLD << ANSI_BRIGHT_GREEN << "100%" << ANSI_RESET << "  "
+                    << "Iter: " << ANSI_BOLD << ANSI_BRIGHT_RED << iteration << ANSI_RESET << "  "
+                    << "Time: " << ANSI_BOLD << ANSI_BRIGHT_RED << elapsed << "s" << ANSI_RESET
+                    << ANSI_BRIGHT_GREEN << " ✔" << ANSI_RESET << "\n";
+      } else {
+        // Barra di progresso
+        Rcpp::Rcout << ANSI_BOLD << "[" << ANSI_BRIGHT_GREEN 
+                    << std::setw(3) << int(progress * 100.0) << "%" << ANSI_RESET << "] "
+                    << ANSI_BOLD << ANSI_BRIGHT_RED << std::setw(5) << t + 1 << ANSI_RESET 
+                    << "/" << iteration << " "
+                    << ANSI_BRIGHT_RED << "⏱ " << elapsed << "s" 
+                    << "<" << remaining << "s" << ANSI_RESET
+                    << "   \r";
+      }
+      
+    }
+    
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
@@ -1015,8 +1188,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     durationOld = duration;
     if(t%thin == 0 && t > burnin-1) {
       Z.row(idx) = z;
-      PDIV[idx] = pS;
-      PSD[idx] = pSSd;
+      PDIST.row(idx) = probDiv;
       TIME[idx] = duration;
       PAR[idx] = lambda;
       PROB[idx] = probAllocation;
@@ -1027,16 +1199,36 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       PREC[idx] = prec;
       idx = idx + 1;
     }
-    if (t%5000 == 0 && t > 0) {
-      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+  } // END MCMC
+  
+  // Final newline after progress bar
+  Rcpp::Rcout << std::endl;
+  
+  // Counter for threshold exceedances
+  int count = 0;
+  // Scan iterations
+  for(int i = 0; i < sp; ++i) {
+    if(PAR[i] >= max_lambda) {
+      count++;
     }
   }
-  std::cout << "End MCMC!\n";
+  // Calculate percentage
+  double percentage = (static_cast<double>(count) / sp) * 100;
+  // Generate warning
+  if(percentage > 50.0) {
+    std::string msg = 
+      "Warning: Lambda exceeded max_lambda " + 
+      std::to_string(percentage) + 
+      "% of the time in the first " + 
+      std::to_string(sp) + 
+      " iterations. It is recommended to increase the value of max_lambda!";
+    Rcpp::warning(msg);
+  }
+  
   return List::create(Named("Allocation") = Z,
-                      Named("Probability") = PROB,
-                      Named("Parameter") = PAR,
-                      Named("Sd_Probability") = PSD,
-                      Named("Mean_Probability") = PDIV,
+                      Named("Allocation_Probability_Matrix") = PROB,
+                      Named("Lambda_Parameter") = PAR,
+                      Named("Probability_Vector_Distribution") = PDIST,
                       Named("Diversity") = D,
                       Named("Proportion_Parameters") = PI,
                       Named("Mu") = MU,

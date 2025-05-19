@@ -28,4 +28,6 @@
 #' @import MCMCpack
 #' @import pheatmap
 #' @import mclust
+#' @import tidyr
+#' @import dplyr
 NULL
