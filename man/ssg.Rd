@@ -12,7 +12,8 @@ ssg(
   burnin = 50,
   thin = 5,
   method = "",
-  trueAll = FALSE
+  trueAll = c(),
+  seed = 10
 )
 }
 \description{

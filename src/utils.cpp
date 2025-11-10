@@ -1,22 +1,28 @@
+#define ARMA_64BIT_WORD
 #include <RcppArmadillo.h>
 #include <math.h>
 #include <R.h>
 #include <Rmath.h>
+#include <random>
 #include <stdlib.h> 
 #include <limits.h>
+#include <unordered_set>
 #include <chrono>
 #include <algorithm>
 #include <RcppArmadilloExtensions/sample.h>
+
 
 #define ANSI_RESET       "\033[0m"
 #define ANSI_BOLD        "\033[1m"
 #define ANSI_WHITE       "\033[97m"
 #define ANSI_RED         "\033[31m"
 #define ANSI_GREEN       "\033[32m"
+#define ANSI_MAGENTA     "\033[35m"
 #define ANSI_YELLOW      "\033[33m"
 #define ANSI_BG_GREEN    "\033[42m"
 #define ANSI_BG_YELLOW   "\033[43m"
 #define ANSI_BG_CYAN     "\033[46m"
+#define ANSI_BG_BLUE    "\033[44m"
 #define ANSI_BRIGHT_RED  "\033[91m"
 #define ANSI_BRIGHT_GREEN "\033[92m"
 
@@ -90,6 +96,65 @@ NumericVector csample_num( NumericVector x,
 }
 
 // [[Rcpp::export]]
+NumericVector csample_num_new(NumericVector x,
+                                 int size,
+                                 Nullable<NumericVector> prob = R_NilValue) {
+  int n = x.size();
+  
+  if (size > n) {
+    stop("Cannot sample more elements than available without replacement.");
+  }
+  
+  NumericVector result(size);
+  
+  // Generatore random per std::shuffle e R::runif
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  
+  // Caso: pesi uniformi
+  if (prob.isNull()) {
+    std::vector<int> indices(n);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::shuffle(indices.begin(), indices.end(), gen);
+    for (int i = 0; i < size; ++i) {
+      result[i] = x[indices[i]];
+    }
+    return result;
+  }
+  
+  // Caso: pesi non uniformi (sampling senza rimpiazzo con metodo di Efraimidis–Spirakis)
+  NumericVector prob_val(prob);
+  if (prob_val.size() != n) {
+    stop("Length of 'x' and 'prob' must match.");
+  }
+  
+  std::vector<std::pair<double, int>> heap;
+  
+  for (int i = 0; i < n; ++i) {
+    if (prob_val[i] <= 0.0) continue;
+    double u = R::runif(0.0, 1.0); // usa R per coerenza con Rcpp
+    double key = std::pow(u, 1.0 / prob_val[i]);
+    heap.emplace_back(key, i);
+  }
+  
+  if (static_cast<int>(heap.size()) < size) {
+    stop("Not enough positive weights to sample requested number of elements.");
+  }
+  
+  std::partial_sort(heap.begin(), heap.begin() + size, heap.end(),
+                    [](const std::pair<double, int>& a, const std::pair<double, int>& b) {
+                      return a.first > b.first;
+                    });
+  
+  for (int i = 0; i < size; ++i) {
+    result[i] = x[heap[i].second];
+  }
+  
+  return result;
+}
+
+
+// [[Rcpp::export]]
 int diracF(int a, int b){
   if (a == b) {
     return 1;
@@ -114,7 +179,6 @@ arma::mat summary_Posterior(arma::imat z) {
   return(sumPost);
 }
 
-// come campionare dalla distribuzione di Dirichlet
 // [[Rcpp::export]]
 arma::mat rdirichlet_cpp(int num_samples, arma::vec alpha_m) {
   int distribution_size = alpha_m.n_elem;
@@ -153,7 +217,6 @@ double BinderLoss(arma::irowvec eAlloc, arma::irowvec tAlloc) {
   return(BL);
 } 
 
-// [[Rcpp::export]]
 int coefBinom(int n, int k) {
   if (k > n)
     return 0;
@@ -221,13 +284,67 @@ double mySum(arma::vec a) {
   return somma;
 }
 
+
+
+// Log-density multivariata con precisione diagonale
+double log_mvnorm_diag_precision(const arma::rowvec& x, const arma::rowvec& mu, const arma::rowvec& diag_prec) {
+  arma::rowvec diff = x - mu;
+  arma::rowvec quad = arma::square(diff) % diag_prec;
+  double quad_form = arma::accu(quad);
+  double log_det = arma::sum(arma::log(diag_prec + std::numeric_limits<double>::epsilon()));
+  double d = x.n_elem;
+  double log_density = 0.5 * (log_det - d * std::log(2 * M_PI) - quad_form);
+  return log_density;
+}
+
+// [[Rcpp::export]]
+double log_likelihood_observed(const arma::mat& data,
+                               const arma::rowvec& pi,
+                               const arma::mat& mu_list,
+                               const arma::mat& diag_precision_list) {
+  int n = data.n_rows;
+  int K = pi.n_elem;
+  double loglik = 0.0;
+   
+  for (int i = 0; i < n; ++i) {
+    double mix_sum = 0.0;
+    for (int k = 0; k < K; ++k) {
+      double log_dens = log_mvnorm_diag_precision(data.row(i), mu_list.row(k), diag_precision_list.row(k));
+      mix_sum += pi[k] * std::exp(log_dens);
+    } 
+    loglik += std::log(mix_sum + std::numeric_limits<double>::epsilon());
+  }
+   
+  return loglik;
+} 
+
+// [[Rcpp::export]]
+double log_likelihood_complete(const arma::mat& data,
+                               const arma::uvec& z,
+                               const arma::rowvec& pi,
+                               const arma::mat& mu_list,
+                               const arma::mat& diag_precision_list) {
+  int n = data.n_rows;
+  double loglik = 0.0;
+  
+  for (int i = 0; i < n; ++i) {
+    int k = z[i];  // 0-based index
+    double log_dens = log_mvnorm_diag_precision(data.row(i), mu_list.row(k), diag_precision_list.row(k));
+    loglik += std::log(pi[k] + std::numeric_limits<double>::epsilon()) + log_dens;
+  } 
+  
+  return loglik;
+} 
+
 ////////////////////////////////////////////////////
 //////////////// D-Dimensional Data ////////////////
 ///////////////////////////////////////////////////
 
 // [[Rcpp::export]]
 List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin, 
-         int thin, String method, arma::irowvec trueAll, int seed) {
+         int thin, String method, bool trueParameters, arma::irowvec trueAll, 
+         arma::mat trueMean, arma::mat truePrec, arma::rowvec truePerc, 
+         int seed, bool pb, bool likelihood, bool onlyComp) {
   // All the seed
   arma::arma_rng::set_seed(seed);
   Rcpp::Environment base_env = Rcpp::Environment::namespace_env("base");
@@ -259,6 +376,12 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
   List MU(nout);
   // SIGMA
   List PREC(nout);
+  // OBSERVED LIKELIHOOD
+  NumericVector OBS_LIK(nout);
+  // COMPLETE LIKELIHOOD
+  NumericVector COMP_LIK(nout);
+  double obs_likelihood = 0.0;
+  double comp_likelihood = 0.0;
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -278,52 +401,65 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
     hyper_prec_b = hyper(5);
     for (int k = 0; k<K; k++) {
       hyper_mu_prec.row(k) = hyper(3)*arma::ones<arma::rowvec>(d);
-    } 
+    }
     hyper_prec_a = hyper(4);
   }
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
-  // Z
+  // Inizialize the vector allocation
   arma::irowvec z(n);
-  NumericVector probC(K);
-  for (int k = 0; k<K; k++) {
-    probC(k) = hyper(0)/K;
-  }
-  if (arma::sum(trueAll) > 0) {
-    z = trueAll;
-  } else {
-    for (int i = 0; i<n; i++) {
-      z(i) = csample_num(indC, 1, true, probC)(0);
-    }
-  }
-  // PI
+  // Iniziallize the mean matrix
+  arma::mat mu(K, d);
+  // Inizialize the precision matrix
+  arma::mat prec(K, d);
+  // Inizialize the percentage vector
   arma::rowvec pi(K);
   arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
-  pi = rdirichlet_cpp(1, concPar);
-  // PRECISION
-  arma::mat prec(K, d);
-  for (int j = 0; j<d; j++) {
+  if (!trueParameters) {
+    // ALLOCATION 
+    NumericVector probC(K);
     for (int k = 0; k<K; k++) {
-      prec(k,j) = callrgamma(1, hyper_prec_a, 1.0/hyper_prec_b)(0);
+      probC(k) = hyper(0)/K;
     }
-  }
-  // MU
-  arma::mat mu(K, d);
-  if (method == "EB") {
-    double kP = 0.01;
+    for (int i = 0; i<n; i++) {
+      // z(i) = csample_num(indC, 1, true, probC)(0);
+      z(i) = csample_num_new(indC, 1, probC)(0);
+    }
+    // PI
+    pi = rdirichlet_cpp(1, concPar);
+    // PRECISION
     for (int j = 0; j<d; j++) {
       for (int k = 0; k<K; k++) {
-        hyper_mu_prec(k,j) = prec(k,j);
-        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(kP*hyper_mu_prec(k,j)));
-      } 
-    } 
-  } else {
-    for (int j = 0; j<d; j++) {
-      for (int k = 0; k<K; k++) {
-        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(hyper_mu_prec(k,j)));
+        prec(k,j) = callrgamma(1, hyper_prec_a, 1.0/hyper_prec_b)(0);
       }
-    } 
+    }
+    // MU
+    if (method == "EB") {
+      double kP = 0.01;
+      for (int j = 0; j<d; j++) {
+        for (int k = 0; k<K; k++) {
+          hyper_mu_prec(k,j) = prec(k,j);
+          mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(kP*hyper_mu_prec(k,j)));
+        } 
+      } 
+    } else {
+      for (int j = 0; j<d; j++) {
+        for (int k = 0; k<K; k++) {
+          mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(hyper_mu_prec(k,j)));
+        }
+      } 
+    }
+  } else {
+    cout << "True parameters are used!" << "\n";
+    // true allocation
+    z = trueAll;
+    // true mean
+    mu = trueMean;
+    // true precision
+    prec = truePrec;
+    // true percentage
+    pi = truePerc;
   }
   // Probability Matrix
   NumericMatrix probAllocation(n, K);
@@ -331,6 +467,9 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
   double durationOld;
+  // Progress bar setup
+  int barWidth = 30;
+  double progress = 0.0;
   for (int t = 0; t<iteration; t++) {
     // start time
     auto start = std::chrono::high_resolution_clock::now();
@@ -351,11 +490,11 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
       probAllocation(i, _) = probAllocation(i, _) / rSum(i);
     }
     // update z
-    // if (trueAll == false) {
     for (int i = 0; i<n; i++) {
-      z(i) = csample_num(indC, 1, false, probAllocation(i, _))(0);
-    } 
-    // }
+      NumericVector prob_r = as<NumericVector>(wrap(probAllocation(i, _)));
+      z(i) = csample_num_new(indC, 1, prob_r)(0);
+      // z(i) = csample_num(indC, 1, false, probAllocation(i, _))(0);
+    }
     // compute N
     arma::irowvec N(K);
     for (int i = 0; i < n; i++) {
@@ -402,32 +541,99 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
         prec(k,j) = callrgamma(1, shape, 1.0/scale)(0);
       }
     }
-    ////////////////////////////////////////////////////
+    
+    if (pb) {
+      if (t % 100 == 0 || t == iteration - 1) {
+        // Calculate progress and time estimates
+        progress = static_cast<double>(t + 1) / iteration;
+        auto now = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
+        double remaining = elapsed / progress * (1 - progress);
+        
+        // Progress bar
+        Rcpp::Rcout << "[";
+        int pos = barWidth * progress;
+        for (int i = 0; i < barWidth; ++i) {
+          if (i < pos) Rcpp::Rcout << "=";
+          else if (i == pos) Rcpp::Rcout << ">";
+          else Rcpp::Rcout << " ";
+        }
+        
+        // Display information
+        Rcpp::Rcout << ANSI_BOLD << ANSI_BG_BLUE << ANSI_WHITE << " SSG RUNNING " << ANSI_RESET << " ";
+        
+        if (t == iteration - 1) {
+          Rcpp::Rcout << ANSI_BOLD << ANSI_BRIGHT_GREEN << "✓ " 
+                      << ANSI_BG_GREEN << ANSI_WHITE << "COMPLETED" << ANSI_RESET << " "
+                      << ANSI_BOLD << ANSI_BRIGHT_GREEN << "100%" << ANSI_RESET << "  "
+                      << "Iter: " << ANSI_BOLD << ANSI_BRIGHT_RED << iteration << ANSI_RESET << "  "
+                      << "Time: " << ANSI_BOLD << ANSI_BRIGHT_RED << elapsed << "s" << ANSI_RESET
+                      << ANSI_BRIGHT_GREEN << " ✔" << ANSI_RESET << "\n";
+        } else { 
+          Rcpp::Rcout << ANSI_BOLD << "[" << ANSI_BRIGHT_GREEN 
+                      << std::setw(3) << int(progress * 100.0) << "%" << ANSI_RESET << "] "
+                      << ANSI_BOLD << ANSI_BRIGHT_RED << std::setw(5) << t + 1 << ANSI_RESET 
+                      << "/" << iteration << " "
+                      << ANSI_BRIGHT_RED << "⏱ " << elapsed << "s" 
+                      << "<" << remaining << "s" << ANSI_RESET
+                      << "   \r";
+        }
+      } 
+    }
+    ///////////////////////////////////////////////////
+    /////////////////// Likelihood ////////////////////
+    ///////////////////////////////////////////////////
+    if (likelihood) {
+      // Observed likelihood
+      obs_likelihood = log_likelihood_observed(X, pi, mu, prec);
+      // Complete likelihood
+      arma::uvec z_uvec = arma::conv_to<arma::uvec>::from(z);
+      comp_likelihood = log_likelihood_complete(X, z_uvec, pi, mu, prec);
+    }
+    ///////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
     auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();//1000000;
+    auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
     durationOld = duration;
-    if(t%thin == 0 && t > burnin-1) {
-      Z.row(idx) = z;
-      PI.row(idx) = pi;
-      TIME[idx] = duration;
-      PROB[idx] = probAllocation;
-      MU[idx] = mu;
-      PREC[idx] = prec;
-      idx = idx + 1;
-    }
-    if (t%5000 == 0 && t > 0) {
-      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
+    
+    if (onlyComp) {
+      if(t%thin == 0 && t > burnin-1) {
+        TIME[idx] = duration;
+        if (likelihood) {
+          COMP_LIK[idx] = comp_likelihood;
+        }
+        idx = idx + 1;
+      }
+    } else {
+      if(t%thin == 0 && t > burnin-1) {
+        Z.row(idx) = z;
+        PI.row(idx) = pi;
+        TIME[idx] = duration;
+        PROB[idx] = probAllocation;
+        MU[idx] = mu;
+        PREC[idx] = prec;
+        if (likelihood) {
+          OBS_LIK[idx] = obs_likelihood;
+          COMP_LIK[idx] = comp_likelihood;
+        }
+        idx = idx + 1;
+      }
     }
   }
-  std::cout << "End MCMC!\n";
-  return List::create(Named("Allocation") = Z,
-                      Named("Probability") = PROB,
-                      Named("Proportion_Parameters") = PI,
-                      Named("Mu") = MU,
-                      Named("Precision") = PREC,
-                      Named("Execution_Time") = TIME);
+  if (onlyComp) {
+    return List::create(Named("Complete_Likelihood") = COMP_LIK,
+                        Named("Execution_Time") = TIME);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Probability") = PROB,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Observed_Likelihood") = OBS_LIK,
+                        Named("Complete_Likelihood") = COMP_LIK,
+                        Named("Execution_Time") = TIME);
+  }
 }
 
 
@@ -439,7 +645,10 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
 // Random Gibbs sampler d-dimensional
 // [[Rcpp::export]]
 List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration, 
-          int burnin, int thin, String method, int seed) {
+          int burnin, int thin, String method, bool trueParameters,
+          arma::irowvec trueAll, arma::mat trueMean, arma::mat truePrec,
+          arma::rowvec truePerc, int seed, bool pb, bool likelihood,
+          bool onlyComp) {
   arma::arma_rng::set_seed(seed);
   Rcpp::Environment base_env = Rcpp::Environment::namespace_env("base");
   Rcpp::Function set_seed_r = base_env["set.seed"];
@@ -481,6 +690,12 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   List MU(nout);
   // SIGMA
   List PREC(nout);
+  // OBSERVED LIKELIHOOD
+  NumericVector OBS_LIK(nout);
+  // COMPLETE LIKELIHOOD
+  NumericVector COMP_LIK(nout);
+  double obs_likelihood = 0.0;
+  double comp_likelihood = 0.0;
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -506,42 +721,59 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
-  // Z
+  // Inizialize the vector allocation
   arma::irowvec z(n);
-  NumericVector probC(K);
-  for (int k = 0; k<K; k++) {
-    probC(k) = hyper(0)/K;
-  } 
-  for (int i = 0; i<n; i++) {
-    z(i) = csample_num(indC, 1, true, probC)(0);
-  } 
-  // PI
+  // Iniziallize the mean matrix
+  arma::mat mu(K, d);
+  // Inizialize the precision matrix
+  arma::mat prec(K, d);
+  // Inizialize the percentage vector
   arma::rowvec pi(K);
   arma::vec concPar = (hyper(1)/K) * arma::ones<arma::vec>(K);
-  pi = rdirichlet_cpp(1, concPar);
-  // PRECISION
-  arma::mat prec(K, d);
-  for (int j = 0; j<d; j++) {
+  if (!trueParameters) {
+    // ALLOCATION 
+    NumericVector probC(K);
     for (int k = 0; k<K; k++) {
-      prec(k,j) = callrgamma(1, hyper_prec_a, 1.0/hyper_prec_b)(0);
+      probC(k) = hyper(0)/K;
     }
-  }
-  // MU
-  arma::mat mu(K, d);
-  if (method == "EB") {
-    double kP = 0.01;
+    for (int i = 0; i<n; i++) {
+      // z(i) = csample_num(indC, 1, true, probC)(0);
+      z(i) = csample_num_new(indC, 1, probC)(0);
+    }
+    // PI
+    pi = rdirichlet_cpp(1, concPar);
+    // PRECISION
     for (int j = 0; j<d; j++) {
       for (int k = 0; k<K; k++) {
-        hyper_mu_prec(k,j) = prec(k,j);
-        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(kP*hyper_mu_prec(k,j)));
-      } 
-    } 
-  } else {
-    for (int j = 0; j<d; j++) {
-      for (int k = 0; k<K; k++) {
-        mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(hyper_mu_prec(k,j)));
+        prec(k,j) = callrgamma(1, hyper_prec_a, 1.0/hyper_prec_b)(0);
       }
-    } 
+    }
+    // MU
+    if (method == "EB") {
+      double kP = 0.01;
+      for (int j = 0; j<d; j++) {
+        for (int k = 0; k<K; k++) {
+          hyper_mu_prec(k,j) = prec(k,j);
+          mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(kP*hyper_mu_prec(k,j)));
+        } 
+      } 
+    } else {
+      for (int j = 0; j<d; j++) {
+        for (int k = 0; k<K; k++) {
+          mu(k,j) = R::rnorm(hyper_mu_mean(j), 1.0/sqrt(hyper_mu_prec(k,j)));
+        }
+      } 
+    }
+  } else {
+    cout << "True parameters are used!" << "\n";
+    // true allocation
+    z = trueAll;
+    // true mean
+    mu = trueMean;
+    // true precision
+    prec = truePrec;
+    // true percentage
+    pi = truePerc;
   }
   NumericVector rI(m);
   // Probability Matrix
@@ -550,6 +782,9 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   NumericVector alpha = constVal;
   // Time 
   double durationOld;
+  // Progress bar setup
+  int barWidth = 30;
+  double progress = 0.0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -557,7 +792,8 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
     // start time
     auto start = std::chrono::high_resolution_clock::now();
     // sample according to alpha (uniform)
-    rI = csample_num(indI, m, false, alpha);
+    // rI = csample_num(indI, m, false, alpha);
+    rI = csample_num_new(indI, m, alpha);
     // update probability
     // STEP 1. Compute the probability
     for (int i = 0; i<m; i++) {
@@ -576,7 +812,9 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
     }
     // update z
     for (int i = 0; i<m; i++) {
-      z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
+      NumericVector prob_r = as<NumericVector>(wrap(probAllocation(rI[i], _)));
+      z(rI[i]) = csample_num_new(indC, 1, prob_r)(0);
+      // z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
     }
     // compute N
     arma::irowvec N(K);
@@ -624,51 +862,103 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
         prec(k,j) = callrgamma(1, shape, 1.0/scale)(0);
       }
     }
+    
+    if (pb) {
+      if (t % 100 == 0 || t == iteration - 1) {
+        // Calculate progress and time estimates
+        progress = static_cast<double>(t + 1) / iteration;
+        auto now = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
+        double remaining = elapsed / progress * (1 - progress);
+        
+        // Progress bar
+        Rcpp::Rcout << "[";
+        int pos = barWidth * progress;
+        for (int i = 0; i < barWidth; ++i) {
+          if (i < pos) Rcpp::Rcout << "=";
+          else if (i == pos) Rcpp::Rcout << ">";
+          else Rcpp::Rcout << " ";
+        }
+        
+        // Display information
+        Rcpp::Rcout << ANSI_BOLD << ANSI_BG_BLUE << ANSI_WHITE << " RSG RUNNING " << ANSI_RESET << " ";
+        
+        if (t == iteration - 1) {
+          Rcpp::Rcout << ANSI_BOLD << ANSI_BRIGHT_GREEN << "✓ " 
+                      << ANSI_BG_GREEN << ANSI_WHITE << "COMPLETED" << ANSI_RESET << " "
+                      << ANSI_BOLD << ANSI_BRIGHT_GREEN << "100%" << ANSI_RESET << "  "
+                      << "Iter: " << ANSI_BOLD << ANSI_BRIGHT_RED << iteration << ANSI_RESET << "  "
+                      << "Time: " << ANSI_BOLD << ANSI_BRIGHT_RED << elapsed << "s" << ANSI_RESET
+                      << ANSI_BRIGHT_GREEN << " ✔" << ANSI_RESET << "\n";
+        } else {
+          Rcpp::Rcout << ANSI_BOLD << "[" << ANSI_BRIGHT_GREEN 
+                      << std::setw(3) << int(progress * 100.0) << "%" << ANSI_RESET << "] "
+                      << ANSI_BOLD << ANSI_BRIGHT_RED << std::setw(5) << t + 1 << ANSI_RESET 
+                      << "/" << iteration << " "
+                      << ANSI_BRIGHT_RED << "⏱ " << elapsed << "s" 
+                      << "<" << remaining << "s" << ANSI_RESET
+                      << "   \r";
+        }
+      }
+    }
+    ///////////////////////////////////////////////////
+    /////////////////// Likelihood ////////////////////
+    ///////////////////////////////////////////////////
+    if (likelihood) {
+      // Observed likelihood
+      obs_likelihood = log_likelihood_observed(X, pi, mu, prec);
+      // Complete likelihood
+      arma::uvec z_uvec = arma::conv_to<arma::uvec>::from(z);
+      comp_likelihood = log_likelihood_complete(X, z_uvec, pi, mu, prec);
+    }
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();//1000000;
     durationOld = duration;
-    if(t%thin == 0 && t > burnin-1) {
-      Z.row(idx) = z;
-      PI.row(idx) = pi;
-      TIME[idx] = duration;
-      MU[idx] = mu;
-      PREC[idx] = prec;
-      idx = idx + 1;
+    
+    if (onlyComp) {
+      if(t%thin == 0 && t > burnin-1) {
+        TIME[idx] = duration;
+        if (likelihood) {
+          COMP_LIK[idx] = comp_likelihood;
+        }
+        idx = idx + 1;
+      }
+    } else {
+      if(t%thin == 0 && t > burnin-1) {
+        Z.row(idx) = z;
+        PI.row(idx) = pi;
+        TIME[idx] = duration;
+        MU[idx] = mu;
+        PREC[idx] = prec;
+        if (likelihood) {
+          OBS_LIK[idx] = obs_likelihood;
+          COMP_LIK[idx] = comp_likelihood;
+        }
+        idx = idx + 1;
+      }
     }
-    if (t%5000 == 0 && t > 0) {
-      std::cout << "Iteration: " << t << " (of " << iteration << ")\n";
-    }
+
   }
-  std::cout << "End MCMC!\n";
-  return List::create(Named("Allocation") = Z,
-                      Named("Proportion_Parameters") = PI,
-                      Named("Mu") = MU,
-                      Named("Precision") = PREC,
-                      Named("Execution_Time") = TIME);
+  if (onlyComp) {
+    return List::create(Named("Complete_Likelihood") = COMP_LIK,
+                        Named("Execution_Time") = TIME);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Observed_Likelihood") = OBS_LIK,
+                        Named("Complete_Likelihood") = COMP_LIK,
+                        Named("Execution_Time") = TIME);
+  }
 }
 
 ////////////////////////////////////////////////////
 ////////// Entropy-Guided Gibbs Sampler ///////////
 //////////////////////////////////////////////////
-
-// [[Rcpp::export]]
-double JS_distance(NumericVector p, NumericVector q) {
-  int n = p.size();
-  NumericVector D_KL_p(n);
-  NumericVector D_KL_q(n);
-  NumericVector meanDist = 0.5*(p+q);
-  for (int i = 0; i<n; i++) {
-    D_KL_p(i) = p(i)*log2((p(i)/meanDist(i)) + 0.000001);
-    D_KL_q(i) = q(i)*log2((q(i)/meanDist(i)) + 0.000001);
-  }
-  double sum_D_KL_p = sum(D_KL_p);
-  double sum_D_KL_q = sum(D_KL_q);
-  double distance = 0.5 * (sum_D_KL_p + sum_D_KL_q);
-  return(distance);
-}
 
 
 double myRound(double x) {
@@ -676,22 +966,7 @@ double myRound(double x) {
   return(out);
 }
 
-double custom_quantile(NumericVector data, double p) {
-  if(data.size() == 0 || p < 0.0 || p > 1.0) 
-    return NA_REAL;
-  NumericVector sorted = clone(data).sort();
-  int n = sorted.size();
-  double h = (n - 1)*p + 1;
-  int k = static_cast<int>(h);
-  double fraction = h - k;
-  if(k >= n - 1) {
-    return sorted[n - 1];
-  } else {
-    return (1.0 - fraction)*sorted[k - 1] + fraction*sorted[k];
-  }
-}
-
-double find_lambda(const arma::vec& pi, double m_target, double max_lambda, double lambda_init = 1.0, double tol = 1e-6, int max_iter = 100) {
+double find_lambda(const arma::vec& pi, double m_target, double max_lambda, double lambda_init = 1.0, double tol = 1e-2, int max_iter = 10) {
   double lambda = std::clamp(lambda_init, 1.0, max_lambda);
   double ESS = 0.0;
   
@@ -734,8 +1009,6 @@ double find_lambda(const arma::vec& pi, double m_target, double max_lambda, doub
   }
   
   return lambda;
-  
-  // provare ad utilizzare long double
 } 
 
 double sma(
@@ -776,7 +1049,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
                         double xmPareto, String DiversityIndex, 
                         bool adaptive, double nSD, double lambda0,
                         int L, double max_lambda, double c, double a, String w_fun, int sp,
-                        int seed) {
+                        int seed, bool pb, bool likelihood, bool onlyComp) {
   arma::arma_rng::set_seed(seed);
   Rcpp::Environment base_env = Rcpp::Environment::namespace_env("base");
   Rcpp::Function set_seed_r = base_env["set.seed"];
@@ -829,8 +1102,12 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   List MU(nout);
   // SIGMA
   List PREC(nout);
-  // LAMBDA WARNING
-  NumericVector EST_LAMBDA(nout);
+  // OBSERVED LIKELIHOOD
+  NumericVector OBS_LIK(nout);
+  // COMPLETE LIKELIHOOD
+  NumericVector COMP_LIK(nout);
+  double obs_likelihood = 0.0;
+  double comp_likelihood = 0.0;
   ////////////////////////////////////////////////////
   ////////// Emprical bayes prior settings ///////////
   ///////////////////////////////////////////////////
@@ -859,7 +1136,6 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   // Progress bar setup
   int barWidth = 30;
   double progress = 0.0;
-  auto overall_start = std::chrono::high_resolution_clock::now();
   ////////////////////////////////////////////////////
   ////////////////// Initial value //////////////////
   ///////////////////////////////////////////////////
@@ -870,7 +1146,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     probC(k) = hyper(0)/K;
   } 
   for (int i = 0; i<n; i++) {
-    z(i) = csample_num(indC, 1, true, probC)(0);
+    // z(i) = csample_num(indC, 1, true, probC)(0);
+    z(i) = csample_num_new(indC, 1, probC)(0);
   } 
   // PI
   arma::rowvec pi(K);
@@ -942,6 +1219,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         if (lambda0 == 0) {updateLambda = 10;}
       }
     }
+    // if (lambda0 == 0) {updateLambda = 100;}
     // update probability
     if (t%updateProbAlloc == 0) {
       for (int i = 0; i<n; i++) {
@@ -960,20 +1238,19 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       }
     }
     if (adaptive) {
-      for (int i = 0; i<n; i++) {
-        probDiv(i) = probAllocation(i, z(i));
-      }
-      // pSSd = sqrt(var(probDiv));
-      // pS = mean(probDiv);
       DiversityIndex = "Exponential";
       if (t > sp) {
         lambda = 1;
       } else {
         if (lambda0 == 0) {
           if (t%updateLambda == 0) {
+            for (int i = 0; i<n; i++) {
+              int col = z[i];
+              probDiv[i] = probAllocation(i, col);
+            }
             lambda_est = find_lambda(probDiv, c*m, max_lambda);
+            lambda = sma(PAR, L, lambda_est);
           }
-          lambda = sma(PAR, L, lambda_est);
         } else {
           lambda = lambda0;
         }
@@ -1077,10 +1354,13 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       alpha_norm(i) = (alpha(i) / sumAlpha);
     }
     // sample according to alpha
-    rI = csample_num(indI, m, false, alpha_norm);
+    // rI = csample_num(indI, m, false, alpha_norm);
+    rI = csample_num_new(indI, m, alpha_norm);
     // update z
     for (int i = 0; i<m; i++) {
-      z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
+      NumericVector prob_r = as<NumericVector>(wrap(probAllocation(rI[i], _)));
+      z(rI[i]) = csample_num_new(indC, 1, prob_r)(0);
+      // z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
     }
     // compute N
     arma::irowvec N(K);
@@ -1129,75 +1409,96 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     alpha_prec = alpha;
     
-    ////////////////////////////////////////////////////
-    ///////////////// Progress Reporting ///////////////
-    ////////////////////////////////////////////////////
-    if (t % 100 == 0 || t == iteration - 1) {
-      // Calculate progress and time estimates
-      progress = static_cast<double>(t + 1) / iteration;
-      auto now = std::chrono::high_resolution_clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - overall_start).count();
-      double remaining = elapsed / progress * (1 - progress);
-      
-      // Progress bar
-      Rcpp::Rcout << "[";
-      int pos = barWidth * progress;
-      for (int i = 0; i < barWidth; ++i) {
-        if (i < pos) Rcpp::Rcout << "=";
-        else if (i == pos) Rcpp::Rcout << ">";
-        else Rcpp::Rcout << " ";
+    if (pb) {
+      ////////////////////////////////////////////////////
+      ///////////////// Progress Reporting ///////////////
+      ////////////////////////////////////////////////////
+      if (t % 100 == 0 || t == iteration - 1) {
+        // Calculate progress and time estimates
+        progress = static_cast<double>(t + 1) / iteration;
+        auto now = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
+        double remaining = elapsed / progress * (1 - progress);
+        
+        // Progress bar
+        Rcpp::Rcout << "[";
+        int pos = barWidth * progress;
+        for (int i = 0; i < barWidth; ++i) {
+          if (i < pos) Rcpp::Rcout << "=";
+          else if (i == pos) Rcpp::Rcout << ">";
+          else Rcpp::Rcout << " ";
+        }
+        
+        // Display information
+        bool is_adapting = t < sp;
+        
+        if (is_adapting) {
+          Rcpp::Rcout << ANSI_BOLD << ANSI_BG_YELLOW << ANSI_WHITE << " ADAPTING λ " << ANSI_RESET << " ";
+        } else { 
+          Rcpp::Rcout << ANSI_BOLD << ANSI_BG_CYAN << ANSI_WHITE << " FIXED λ " << ANSI_RESET << " ";
+        }
+         
+        if (t == iteration - 1) {
+          Rcpp::Rcout << ANSI_BOLD << ANSI_BRIGHT_GREEN << "✓ " 
+                      << ANSI_BG_GREEN << ANSI_WHITE << "COMPLETED" << ANSI_RESET << " "
+                      << ANSI_BOLD << ANSI_BRIGHT_GREEN << "100%" << ANSI_RESET << "  "
+                      << "Iter: " << ANSI_BOLD << ANSI_BRIGHT_RED << iteration << ANSI_RESET << "  "
+                      << "Time: " << ANSI_BOLD << ANSI_BRIGHT_RED << elapsed << "s" << ANSI_RESET
+                      << ANSI_BRIGHT_GREEN << " ✔" << ANSI_RESET << "\n";
+        } else {
+          Rcpp::Rcout << ANSI_BOLD << "[" << ANSI_BRIGHT_GREEN 
+                      << std::setw(3) << int(progress * 100.0) << "%" << ANSI_RESET << "] "
+                      << ANSI_BOLD << ANSI_BRIGHT_RED << std::setw(5) << t + 1 << ANSI_RESET 
+                      << "/" << iteration << " "
+                      << ANSI_BRIGHT_RED << "⏱ " << elapsed << "s" 
+                      << "<" << remaining << "s" << ANSI_RESET
+                      << "   \r";
+        }
       }
-      
-      // Display information
-      bool is_adapting = t < sp;  // Soglia per adattamento parametri
-      
-      if (is_adapting) {
-        // Messaggio di adattamento attivo
-        Rcpp::Rcout << ANSI_BOLD << ANSI_BG_YELLOW << ANSI_WHITE << " ADAPTING λ " << ANSI_RESET << " ";
-      } else { 
-        // Messaggio di adattamento disattivato
-        Rcpp::Rcout << ANSI_BOLD << ANSI_BG_CYAN << ANSI_WHITE << " FIXED λ " << ANSI_RESET << " ";
-      }
-       
-      if (t == iteration - 1) {
-        // Messaggio di completamento
-        Rcpp::Rcout << ANSI_BOLD << ANSI_BRIGHT_GREEN << "✓ " 
-                    << ANSI_BG_GREEN << ANSI_WHITE << "COMPLETED" << ANSI_RESET << " "
-                    << ANSI_BOLD << ANSI_BRIGHT_GREEN << "100%" << ANSI_RESET << "  "
-                    << "Iter: " << ANSI_BOLD << ANSI_BRIGHT_RED << iteration << ANSI_RESET << "  "
-                    << "Time: " << ANSI_BOLD << ANSI_BRIGHT_RED << elapsed << "s" << ANSI_RESET
-                    << ANSI_BRIGHT_GREEN << " ✔" << ANSI_RESET << "\n";
-      } else {
-        // Barra di progresso
-        Rcpp::Rcout << ANSI_BOLD << "[" << ANSI_BRIGHT_GREEN 
-                    << std::setw(3) << int(progress * 100.0) << "%" << ANSI_RESET << "] "
-                    << ANSI_BOLD << ANSI_BRIGHT_RED << std::setw(5) << t + 1 << ANSI_RESET 
-                    << "/" << iteration << " "
-                    << ANSI_BRIGHT_RED << "⏱ " << elapsed << "s" 
-                    << "<" << remaining << "s" << ANSI_RESET
-                    << "   \r";
-      }
-      
     }
-    
+    ///////////////////////////////////////////////////
+    /////////////////// Likelihood ////////////////////
+    ///////////////////////////////////////////////////
+    if (likelihood) {
+      // Observed likelihood
+      obs_likelihood = log_likelihood_observed(X, pi, mu, prec);
+      // Complete likelihood
+      arma::uvec z_uvec = arma::conv_to<arma::uvec>::from(z);
+      comp_likelihood = log_likelihood_complete(X, z_uvec, pi, mu, prec);
+    }
     ////////////////////////////////////////////////////
     ///////////////// Store Results ///////////////////
     ///////////////////////////////////////////////////
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = durationOld + std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();//1000000;
     durationOld = duration;
-    if(t%thin == 0 && t > burnin-1) {
-      Z.row(idx) = z;
-      PDIST.row(idx) = probDiv;
-      TIME[idx] = duration;
-      PAR[idx] = lambda;
-      PROB[idx] = probAllocation;
-      ALPHA.row(idx) = alpha;
-      PI.row(idx) = pi;
-      D.row(idx) = Diversity;
-      MU[idx] = mu;
-      PREC[idx] = prec;
-      idx = idx + 1;
+    
+    if (onlyComp) {
+      if(t%thin == 0 && t > burnin-1) {
+        TIME[idx] = duration;
+        if (likelihood) {
+          COMP_LIK[idx] = comp_likelihood;
+        }
+        idx = idx + 1;
+      }
+    } else {
+      if(t%thin == 0 && t > burnin-1) {
+        Z.row(idx) = z;
+        PDIST.row(idx) = probDiv;
+        TIME[idx] = duration;
+        PAR[idx] = lambda;
+        PROB[idx] = probAllocation;
+        ALPHA.row(idx) = alpha;
+        PI.row(idx) = pi;
+        D.row(idx) = Diversity;
+        MU[idx] = mu;
+        PREC[idx] = prec;
+        if (likelihood) {
+          OBS_LIK[idx] = obs_likelihood;
+          COMP_LIK[idx] = comp_likelihood;
+        }
+        idx = idx + 1;
+      }
     }
   } // END MCMC
   
@@ -1215,7 +1516,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   // Calculate percentage
   double percentage = (static_cast<double>(count) / sp) * 100;
   // Generate warning
-  if(percentage > 50.0) {
+  if(percentage > 20.0) {
     std::string msg = 
       "Warning: Lambda exceeded max_lambda " + 
       std::to_string(percentage) + 
@@ -1224,20 +1525,25 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       " iterations. It is recommended to increase the value of max_lambda!";
     Rcpp::warning(msg);
   }
-  
-  return List::create(Named("Allocation") = Z,
-                      Named("Allocation_Probability_Matrix") = PROB,
-                      Named("Lambda_Parameter") = PAR,
-                      Named("Probability_Vector_Distribution") = PDIST,
-                      Named("Diversity") = D,
-                      Named("Proportion_Parameters") = PI,
-                      Named("Mu") = MU,
-                      Named("Precision") = PREC,
-                      Named("Alpha") = ALPHA,
-                      Named("Execution_Time") = TIME);
+  if (onlyComp) {
+    return List::create(Named("Complete_Likelihood") = COMP_LIK,
+                        Named("Execution_Time") = TIME);
+  } else {
+    return List::create(Named("Allocation") = Z,
+                        Named("Allocation_Probability_Matrix") = PROB,
+                        Named("Lambda_Parameter") = PAR,
+                        Named("Probability_Vector_Distribution") = PDIST,
+                        Named("Diversity") = D,
+                        Named("Proportion_Parameters") = PI,
+                        Named("Mu") = MU,
+                        Named("Precision") = PREC,
+                        Named("Alpha") = ALPHA,
+                        Named("Observed_Likelihood") = OBS_LIK,
+                        Named("Complete_Likelihood") = COMP_LIK,
+                        Named("Execution_Time") = TIME); 
+  }
   
 }
-
 
 
 ////////////////////////////////////////////////////

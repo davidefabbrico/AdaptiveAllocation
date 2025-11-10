@@ -61,20 +61,20 @@ mySum <- function(a) {
     .Call(`_AdaptiveAllocation_mySum`, a)
 }
 
-SSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAll) {
-    .Call(`_AdaptiveAllocation_SSG`, X, hyper, K, iteration, burnin, thin, method, trueAll)
+SSG <- function(X, hyper, K, iteration, burnin, thin, method, trueAll, seed) {
+    .Call(`_AdaptiveAllocation_SSG`, X, hyper, K, iteration, burnin, thin, method, trueAll, seed)
 }
 
-RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method) {
-    .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method)
+RSSG <- function(X, hyper, K, m, iteration, burnin, thin, method, seed) {
+    .Call(`_AdaptiveAllocation_RSSG`, X, hyper, K, m, iteration, burnin, thin, method, seed)
 }
 
 JS_distance <- function(p, q) {
     .Call(`_AdaptiveAllocation_JS_distance`, p, q)
 }
 
-DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a, w_fun, sp) {
-    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, iterTuning, thin, updateProbAlloc, method, gamma, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, zeta, a, w_fun, sp)
+DiversityGibbsSamp <- function(X, hyper, K, m, iteration, burnin, thin, updateProbAlloc, method, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, L, max_lambda, c, a, w_fun, sp, seed) {
+    .Call(`_AdaptiveAllocation_DiversityGibbsSamp`, X, hyper, K, m, iteration, burnin, thin, updateProbAlloc, method, q, lambda, kWeibull, alphaPareto, xmPareto, DiversityIndex, adaptive, nSD, lambda0, L, max_lambda, c, a, w_fun, sp, seed)
 }
 
 CSSG <- function(X, hyper, K, R, iteration, burnin, thin) {

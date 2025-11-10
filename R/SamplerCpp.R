@@ -4,7 +4,9 @@
 
 ##### ------------------------------------------------------------------ ######
 ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin = 50,
-                thin = 5, method = "", trueAll = c(), seed = 10) {
+                thin = 5, method = "", trueParameters = F, trueAll = c(), trueMean = matrix(0),
+                truePrec = matrix(0), truePerc = c(), seed = 10, pb = T, likelihood = F,
+                onlyComp = F) {
   # Hyperparameters description:
   # 1 concPar Dirichlet
   # 2 categorical
@@ -13,14 +15,24 @@ ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin 
   # 5 a0 gamma
   # 6 b0 gamma
   # d-dimensional gaussian data
-  if (length(trueAll) == 0) {
-    trueAll <- rep(0, nrow(X))
+  d <- ncol(X)
+  n <- nrow(X)
+  if (sum(trueAll) > 0) {
+    trueAll <- matrix(trueAll, nrow = 1, ncol = n)
+    trueMean <- matrix(trueMean, nrow = K, ncol = d)
+    truePrec <- matrix(truePrec, nrow = K, ncol = d)
+    truePerc <- matrix(truePerc, nrow = 1, ncol = K)
   } else {
-    trueAll <- matrix(trueAll, nrow = 1, ncol = nrow(X))
+    trueAll <- matrix(0, nrow = 1, ncol = n)
+    trueMean <- matrix(0, nrow = K, ncol = d)
+    truePrec <- matrix(0, nrow = K, ncol = d)
+    truePerc <- matrix(0, nrow = 1, ncol = K)
   }
   res <- SSG(as.matrix(X), as.vector(hyper), as.integer(K),
              as.integer(iteration), as.integer(burnin), as.integer(thin), as.character(method),
-             as.vector(trueAll), as.integer(seed))
+             as.logical(trueParameters), as.vector(trueAll), as.matrix(trueMean), as.matrix(truePrec),
+             as.vector(truePerc), as.integer(seed), as.logical(pb), as.logical(likelihood),
+             as.logical(onlyComp))
   return(res)
 }
 
@@ -30,10 +42,28 @@ ssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, iteration = 1000, burnin 
 
 ##### ------------------------------------------------------------------ ######
 rssg <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10, iteration = 1000, 
-                 burnin = 50, thin = 5, method = "", seed = 10) {
+                 burnin = 50, thin = 5, method = "", trueParameters = F, trueAll = c(), 
+                 trueMean = matrix(0), truePrec = matrix(0), truePerc = c(), seed = 10, pb = T,
+                 likelihood = F, onlyComp = F) {
+  d <- ncol(X)
+  n <- nrow(X)
+  if (sum(trueAll) > 0) {
+    trueAll <- matrix(trueAll, nrow = 1, ncol = n)
+    trueMean <- matrix(trueMean, nrow = K, ncol = d)
+    truePrec <- matrix(truePrec, nrow = K, ncol = d)
+    truePerc <- matrix(truePerc, nrow = 1, ncol = K)
+  } else {
+    trueAll <- matrix(0, nrow = 1, ncol = n)
+    trueMean <- matrix(0, nrow = K, ncol = d)
+    truePrec <- matrix(0, nrow = K, ncol = d)
+    truePerc <- matrix(0, nrow = 1, ncol = K)
+  }
   res <- RSSG(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
               as.integer(iteration), as.integer(burnin), as.integer(thin), 
-              as.character(method), as.integer(seed))
+              as.character(method), as.logical(trueParameters), as.vector(trueAll), 
+              as.matrix(trueMean), as.matrix(truePrec),
+              as.vector(truePerc), as.integer(seed), as.logical(pb), as.logical(likelihood),
+              as.logical(onlyComp))
   return(res)
 }
 
@@ -48,7 +78,7 @@ AdaptRSG <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10,
                      lambda = 1, kWeibull = 1, alphaPareto = 1, xmPareto = 0.5,
                      DiversityIndex = "Exponential", adaptive = FALSE, nSD = 1.96,
                      lambda0 = 30, L = 1, max_lambda = 50, c = 1, a = 1, w_fun = "hyperbolic", sp = 0, 
-                     seed = 10) {
+                     seed = 10, pb = T, likelihood = T, onlyComp = F) {
   
   res <- DiversityGibbsSamp(as.matrix(X), as.vector(hyper), as.integer(K), as.integer(m),
                             as.integer(iteration), as.integer(burnin), as.integer(thin), 
@@ -58,7 +88,8 @@ AdaptRSG <- function(X, hyper = c(1, 1, 0, 1, 1, 1), K = 3, m = 10,
                             as.character(DiversityIndex), as.logical(adaptive), as.double(nSD),
                             as.double(lambda0), as.integer(L), as.double(max_lambda), as.double(c),
                             as.double(a), as.character(w_fun), as.integer(sp),
-                            as.integer(seed))
+                            as.integer(seed), as.logical(pb), as.logical(likelihood),
+                            as.logical(onlyComp))
   return(res)
 }
 

@@ -16,7 +16,6 @@ AdaptCRSG(
   thin = 5,
   updateProbAllocation = 1,
   method = "",
-  gamma = 0.5,
   q = 1,
   lambda = 1,
   kWeibull = 1,

@@ -11,11 +11,9 @@ AdaptRSG(
   m = 10,
   iteration = 1000,
   burnin = 50,
-  iterTuning = 50,
   thin = 5,
   updateProbAllocation = 1,
   method = "",
-  gamma = 0.5,
   q = 1,
   lambda = 1,
   kWeibull = 1,
@@ -23,12 +21,15 @@ AdaptRSG(
   xmPareto = 0.5,
   DiversityIndex = "Exponential",
   adaptive = FALSE,
-  nSD = 1,
-  lambda0 = 40,
-  zeta = 0.996,
-  a = 100,
+  nSD = 1.96,
+  lambda0 = 30,
+  L = 1,
+  max_lambda = 50,
+  c = 1,
+  a = 1,
   w_fun = "hyperbolic",
-  sp = 0
+  sp = 0,
+  seed = 10
 )
 }
 \description{
