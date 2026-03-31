@@ -307,16 +307,44 @@ double log_likelihood_observed(const arma::mat& data,
   double loglik = 0.0;
    
   for (int i = 0; i < n; ++i) {
-    double mix_sum = 0.0;
+    arma::vec log_terms(K);
+    
     for (int k = 0; k < K; ++k) {
       double log_dens = log_mvnorm_diag_precision(data.row(i), mu_list.row(k), diag_precision_list.row(k));
-      mix_sum += pi[k] * std::exp(log_dens);
+      log_terms(k) = std::log(pi[k]) + log_dens; 
     } 
-    loglik += std::log(mix_sum + std::numeric_limits<double>::epsilon());
+    
+    double max_log = log_terms.max();
+    double sum_exp = 0.0;
+    
+    for (int k = 0; k < K; ++k) {
+      sum_exp += std::exp(log_terms(k) - max_log);
+    }
+    
+    loglik += max_log + std::log(sum_exp);
   }
    
   return loglik;
-} 
+}
+// double log_likelihood_observed(const arma::mat& data,
+//                                const arma::rowvec& pi,
+//                                const arma::mat& mu_list,
+//                                const arma::mat& diag_precision_list) {
+//   int n = data.n_rows;
+//   int K = pi.n_elem;
+//   double loglik = 0.0;
+   
+//   for (int i = 0; i < n; ++i) {
+//     double mix_sum = 0.0;
+//     for (int k = 0; k < K; ++k) {
+//       double log_dens = log_mvnorm_diag_precision(data.row(i), mu_list.row(k), diag_precision_list.row(k));
+//       mix_sum += pi[k] * std::exp(log_dens);
+//     } 
+//     loglik += std::log(mix_sum + std::numeric_limits<double>::epsilon());
+//   }
+   
+//   return loglik;
+// } 
 
 // [[Rcpp::export]]
 double log_likelihood_complete(const arma::mat& data,
@@ -370,6 +398,9 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
   List PROB(nout);
   // TIME
   NumericVector TIME(nout);
+  // FCE evaluation
+  NumericVector FCE_EVALS(nout);
+  double cumulative_fce = 0.0; 
   // PI
   arma::mat PI(nout, K);
   // MU
@@ -473,6 +504,10 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
   for (int t = 0; t<iteration; t++) {
     // start time
     auto start = std::chrono::high_resolution_clock::now();
+    
+    // FCE evaluation
+    cumulative_fce += n;
+    
     // update probability
     // STEP 1. Compute the probability
     for (int i = 0; i<n; i++) {
@@ -600,6 +635,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
     if (onlyComp) {
       if(t%thin == 0 && t > burnin-1) {
         TIME[idx] = duration;
+        FCE_EVALS[idx] = cumulative_fce;
         if (likelihood) {
           COMP_LIK[idx] = comp_likelihood;
         }
@@ -610,6 +646,7 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
         Z.row(idx) = z;
         PI.row(idx) = pi;
         TIME[idx] = duration;
+        FCE_EVALS[idx] = cumulative_fce;
         PROB[idx] = probAllocation;
         MU[idx] = mu;
         PREC[idx] = prec;
@@ -623,7 +660,8 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
   }
   if (onlyComp) {
     return List::create(Named("Complete_Likelihood") = COMP_LIK,
-                        Named("Execution_Time") = TIME);
+                        Named("Execution_Time") = TIME,
+                        Named("FCE") = FCE_EVALS);
   } else {
     return List::create(Named("Allocation") = Z,
                         Named("Probability") = PROB,
@@ -632,7 +670,8 @@ List SSG(arma::mat X, arma::vec hyper, int K, int iteration, int burnin,
                         Named("Precision") = PREC,
                         Named("Observed_Likelihood") = OBS_LIK,
                         Named("Complete_Likelihood") = COMP_LIK,
-                        Named("Execution_Time") = TIME);
+                        Named("Execution_Time") = TIME,
+                        Named("FCE") = FCE_EVALS);
   }
 }
 
@@ -684,6 +723,9 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   arma::mat PI(nout, K);
   // Time 
   NumericVector TIME(nout);
+  // FCE evaluation
+  NumericVector FCE_EVALS(nout);
+  double cumulative_fce = 0.0;
   // Entropy
   NumericMatrix D(nout, n);
   // MU
@@ -791,6 +833,8 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   for (int t = 0; t<iteration; t++) {
     // start time
     auto start = std::chrono::high_resolution_clock::now();
+    // FCE evaluation
+    cumulative_fce += m;
     // sample according to alpha (uniform)
     // rI = csample_num(indI, m, false, alpha);
     rI = csample_num_new(indI, m, alpha);
@@ -921,6 +965,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
     if (onlyComp) {
       if(t%thin == 0 && t > burnin-1) {
         TIME[idx] = duration;
+        FCE_EVALS[idx] = cumulative_fce;
         if (likelihood) {
           COMP_LIK[idx] = comp_likelihood;
         }
@@ -931,6 +976,7 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
         Z.row(idx) = z;
         PI.row(idx) = pi;
         TIME[idx] = duration;
+        FCE_EVALS[idx] = cumulative_fce;
         MU[idx] = mu;
         PREC[idx] = prec;
         if (likelihood) {
@@ -944,7 +990,8 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
   }
   if (onlyComp) {
     return List::create(Named("Complete_Likelihood") = COMP_LIK,
-                        Named("Execution_Time") = TIME);
+                        Named("Execution_Time") = TIME,
+                        Named("FCE") = FCE_EVALS);
   } else {
     return List::create(Named("Allocation") = Z,
                         Named("Proportion_Parameters") = PI,
@@ -952,12 +999,13 @@ List RSSG(arma::mat X, arma::vec hyper, int K, int m, int iteration,
                         Named("Precision") = PREC,
                         Named("Observed_Likelihood") = OBS_LIK,
                         Named("Complete_Likelihood") = COMP_LIK,
-                        Named("Execution_Time") = TIME);
+                        Named("Execution_Time") = TIME,
+                        Named("FCE") = FCE_EVALS);
   }
 }
 
 ////////////////////////////////////////////////////
-////////// Entropy-Guided Gibbs Sampler ///////////
+/////// Discomfort-Informed Gibbs Sampler /////////
 //////////////////////////////////////////////////
 
 
@@ -1043,7 +1091,7 @@ double sma(
 // [[Rcpp::export]]
 List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K, 
                         double m, int iteration, int burnin, 
-                        int thin, int updateProbAlloc, String method, 
+                        int thin, int updateProbAlloc_Xi, String method, 
                         double q, double lambda,
                         double kWeibull, double alphaPareto, 
                         double xmPareto, String DiversityIndex, 
@@ -1094,6 +1142,9 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   NumericMatrix ALPHA(nout, n);
   // Probability Distribution
   NumericMatrix PDIST(nout, n);
+  // FCE evaluation
+  NumericVector FCE_EVALS(nout);
+  double cumulative_fce = 0.0;
   // PI
   arma::mat PI(nout, K);
   // Entropy
@@ -1192,7 +1243,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   double sds = ceil(sqrt((n/m)*K*(K-1)));
   double s = ceil((n/m)*(K-1) + nSD*sds);
   // Time 
-  double durationOld;
+  double durationOld = 0.0;
   ////////////////////////////////////////////////////
   /////////////////// Main Part /////////////////////
   ///////////////////////////////////////////////////
@@ -1206,7 +1257,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     // start time
     auto start = std::chrono::high_resolution_clock::now();
     // schedule for updating the probability allocation matrix
-    if (updateProbAlloc == 0) {
+    int updateProbAlloc = updateProbAlloc_Xi;
+    if (updateProbAlloc_Xi == 0) {
       // 1-5-10, 3-6-10, 5-8-10, 7-10-15, 10-15-20
       if (t <= ceil(iteration/4)) {
         updateProbAlloc = 3;
@@ -1221,15 +1273,38 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     }
     // if (lambda0 == 0) {updateLambda = 100;}
     // update probability
+    // if (t%updateProbAlloc == 0) {
+    //   for (int i = 0; i<n; i++) {
+    //     for (int k = 0; k<K; k++) {
+    //       arma::vec vecTmp(d);
+    //       for (int j = 0; j<d; j++) {
+    //         vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
+    //       }
+    //       probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + std::numeric_limits<double>::denorm_min();
+    //     } 
+    //   }
+    //   // Normalize the rows
+    //   arma::vec rSum = rowSums(probAllocation);
+    //   for (int i = 0; i<n; i++) {
+    //     probAllocation(i, _) = probAllocation(i, _) / rSum(i);
+    //   }
+    // }
+    // update probability
     if (t%updateProbAlloc == 0) {
+      cumulative_fce += n;
       for (int i = 0; i<n; i++) {
+        arma::vec log_terms(K);
         for (int k = 0; k<K; k++) {
           arma::vec vecTmp(d);
           for (int j = 0; j<d; j++) {
             vecTmp(j) = R::dnorm(X(i,j), mu(k,j), sqrt(1.0/prec(k,j)), true);
           }
-          probAllocation(i,k) = exp(log(pi(k)) + mySum(vecTmp)) + std::numeric_limits<double>::denorm_min();
+          log_terms(k) = log(pi(k)) + mySum(vecTmp);
         } 
+        double max_log = log_terms.max();
+        for (int k = 0; k<K; k++) {
+          probAllocation(i,k) = exp(log_terms(k) - max_log) + std::numeric_limits<double>::denorm_min();
+        }
       }
       // Normalize the rows
       arma::vec rSum = rowSums(probAllocation);
@@ -1354,14 +1429,42 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
       alpha_norm(i) = (alpha(i) / sumAlpha);
     }
     // sample according to alpha
-    // rI = csample_num(indI, m, false, alpha_norm);
     rI = csample_num_new(indI, m, alpha_norm);
+    cumulative_fce += m;
     // update z
     for (int i = 0; i<m; i++) {
-      NumericVector prob_r = as<NumericVector>(wrap(probAllocation(rI[i], _)));
-      z(rI[i]) = csample_num_new(indC, 1, prob_r)(0);
-      // z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
+      int obs_idx = rI[i];
+    
+      arma::vec log_terms(K);
+      for (int k = 0; k<K; k++) {
+        arma::vec vecTmp(d);
+        for (int j = 0; j<d; j++) {
+          vecTmp(j) = R::dnorm(X(obs_idx, j), mu(k,j), sqrt(1.0/prec(k,j)), true);
+        }
+        log_terms(k) = log(pi(k)) + mySum(vecTmp);
+      }
+      
+      double max_log = log_terms.max();
+      NumericVector prob_r(K);
+      double sum_prob = 0.0;
+      
+      for (int k = 0; k<K; k++) {
+        probAllocation(obs_idx, k) = exp(log_terms(k) - max_log) + std::numeric_limits<double>::denorm_min();
+        prob_r(k) = probAllocation(obs_idx, k);
+        sum_prob += prob_r(k);
+      }
+      prob_r = prob_r / sum_prob;
+      z(obs_idx) = csample_num_new(indC, 1, prob_r)(0);
     }
+    // sample according to alpha
+    // rI = csample_num(indI, m, false, alpha_norm);
+    // rI = csample_num_new(indI, m, alpha_norm);
+    // // update z
+    // for (int i = 0; i<m; i++) {
+    //   NumericVector prob_r = as<NumericVector>(wrap(probAllocation(rI[i], _)));
+    //   z(rI[i]) = csample_num_new(indC, 1, prob_r)(0);
+    //   // z(rI[i]) = csample_num(indC, 1, false, probAllocation(rI[i], _))(0);
+    // }
     // compute N
     arma::irowvec N(K);
     for (int i = 0; i < n; i++) {
@@ -1476,6 +1579,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
     if (onlyComp) {
       if(t%thin == 0 && t > burnin-1) {
         TIME[idx] = duration;
+        FCE_EVALS[idx] = cumulative_fce;
         if (likelihood) {
           COMP_LIK[idx] = comp_likelihood;
         }
@@ -1486,6 +1590,7 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
         Z.row(idx) = z;
         PDIST.row(idx) = probDiv;
         TIME[idx] = duration;
+        FCE_EVALS[idx] = cumulative_fce;
         PAR[idx] = lambda;
         PROB[idx] = probAllocation;
         ALPHA.row(idx) = alpha;
@@ -1527,7 +1632,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
   }
   if (onlyComp) {
     return List::create(Named("Complete_Likelihood") = COMP_LIK,
-                        Named("Execution_Time") = TIME);
+                        Named("Execution_Time") = TIME,
+                        Named("FCE") = FCE_EVALS);
   } else {
     return List::create(Named("Allocation") = Z,
                         Named("Allocation_Probability_Matrix") = PROB,
@@ -1540,7 +1646,8 @@ List DiversityGibbsSamp(arma::mat X, arma::vec hyper, int K,
                         Named("Alpha") = ALPHA,
                         Named("Observed_Likelihood") = OBS_LIK,
                         Named("Complete_Likelihood") = COMP_LIK,
-                        Named("Execution_Time") = TIME); 
+                        Named("Execution_Time") = TIME,
+                        Named("FCE") = FCE_EVALS); 
   }
   
 }
